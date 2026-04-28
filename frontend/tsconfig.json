@@ -1,0 +1,23 @@
+// Source - https://stackoverflow.com/q/64172923
+// Posted by DevLoverUmar, modified by community. See post 'Timeline' for change history
+// Retrieved 2026-04-28, License - CC BY-SA 4.0
+
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "esnext",
+    "moduleResolution": "bundler", // Best for Vite/Webpack
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["src"]
+}
