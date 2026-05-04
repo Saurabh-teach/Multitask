@@ -81,6 +81,11 @@ AUTH_USER_MODEL = 'accounts.User'   # Custom User Model
 # ====================== CORS (For React) ======================
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:3003",
+    "http://localhost:3004",
+    "http://localhost:3005",
 ]
 
 # ====================== REST FRAMEWORK ======================

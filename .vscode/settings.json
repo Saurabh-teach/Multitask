@@ -1,0 +1,12 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\saura\\anaconda3\\python.exe",
+    "python.pythonPath": "C:\\Users\\saura\\anaconda3\\python.exe",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "python.analysis.extraPaths": [
+        "C:\\Users\\saura\\Desktop\\goalflow\\backend"
+    ],
+    "python.envFile": "${workspaceFolder}/backend/.env",
+    "pyrefly.pythonInterpreter": "C:\\Users\\saura\\anaconda3\\python.exe"
+}

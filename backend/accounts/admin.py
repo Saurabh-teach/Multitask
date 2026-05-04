@@ -1,28 +1,48 @@
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
-from .models import User, Organization, OrganizationMember, OTPVerification
+from .models import User, Organization, OrganizationMember, JoinRequest, OTPVerification, Goal, Task, TaskComment
 
-@admin.register(User)
-class CustomUserAdmin(UserAdmin):
-    list_display = ('username', 'phone', 'email', 'first_name', 'last_name', 'is_active')
-    search_fields = ('username', 'phone', 'email')
-    list_filter = ('is_active', 'is_staff')
+# ====================== CUSTOM USER ADMIN ======================
+class CustomUserAdmin(admin.ModelAdmin):
+    list_display = ['username', 'first_name', 'last_name', 'phone', 'email', 'city', 'job_title', 'is_active']
+    search_fields = ['username', 'first_name', 'last_name', 'phone', 'email']
+    list_filter = ['is_active', 'is_staff']
 
-
-@admin.register(Organization)
-class OrganizationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'created_by', 'created_at')
-    search_fields = ('name',)
-
-
-@admin.register(OrganizationMember)
+# ====================== ORGANIZATION MEMBER ADMIN (Improved) ======================
 class OrganizationMemberAdmin(admin.ModelAdmin):
-    list_display = ('user', 'organization', 'role', 'is_active', 'joined_at')
-    list_filter = ('role', 'is_active')
-    search_fields = ('user__username', 'organization__name')
+    list_display = [
+        'user_full_name', 
+        'organization', 
+        'role', 
+        'is_active', 
+        'joined_at'
+    ]
+    list_filter = ['role', 'is_active', 'organization']
+    search_fields = ['user__first_name', 'user__last_name', 'user__username', 'user__phone']
+    raw_id_fields = ['user', 'organization']
 
+    def user_full_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+    user_full_name.short_description = 'Employee Name'
 
-@admin.register(OTPVerification)
-class OTPVerificationAdmin(admin.ModelAdmin):
-    list_display = ('phone', 'otp', 'purpose', 'expires_at', 'created_at')
-    list_filter = ('purpose',)
+    def user_phone(self, obj):
+        return obj.user.phone
+    user_phone.short_description = 'Phone'
+
+    def user_email(self, obj):
+        return obj.user.email
+    user_email.short_description = 'Email'
+
+    def user_job_title(self, obj):
+        return obj.user.job_title
+    user_job_title.short_description = 'Job Title'
+
+# Register improved admins
+admin.site.register(User, CustomUserAdmin)
+admin.site.register(Organization)
+admin.site.register(OrganizationMember, OrganizationMemberAdmin)
+admin.site.register(JoinRequest)
+admin.site.register(OTPVerification)
+
+admin.site.register(Goal)
+admin.site.register(Task)
+admin.site.register(TaskComment)
