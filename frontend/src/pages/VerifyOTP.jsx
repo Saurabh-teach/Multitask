@@ -3,10 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { ShieldCheck, ArrowRight, RefreshCw, Smartphone, Target } from 'lucide-react';
+import { AuthContext } from '../context/AuthContext';
 
 const VerifyOTP = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { login: authLogin } = React.useContext(AuthContext);
 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -24,7 +26,7 @@ const VerifyOTP = () => {
         setOtp(location.state.dev_otp); // Auto-fill
       }
     } else {
-      navigate('/register');
+      navigate('/login');
     }
   }, [location, navigate]);
 
@@ -49,7 +51,7 @@ const VerifyOTP = () => {
       });
 
       toast.success("Verification successful!");
-      localStorage.setItem('token', response.data.token || 'dummy-token');
+      authLogin(response.data.token);
       navigate('/dashboard');
 
     } catch (err) {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
   Plus, Target, Filter, MoreHorizontal, Search, 
-  Calendar, User as UserIcon, ArrowRight, TrendingUp, AlertCircle
+  Calendar, User as UserIcon, ArrowRight, TrendingUp, AlertCircle, Trash2
 } from 'lucide-react';
 import Sidebar from '../../components/layout/Sidebar';
 import { toast } from 'react-hot-toast';
@@ -13,6 +13,7 @@ const Goals = () => {
   const [filteredGoals, setFilteredGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [userRole, setUserRole] = useState('member');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -26,8 +27,10 @@ const Goals = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const orgId = orgRes.data.organizations?.[0]?.organization_id || orgRes.data.organizations?.[0]?.id;
+      const currentOrg = orgRes.data.organizations?.[0];
+      const orgId = currentOrg?.organization_id || currentOrg?.id;
       if (orgId) {
+        setUserRole(currentOrg.role || 'member');
         const res = await axios.get(
           `http://127.0.0.1:8000/api/auth/organizations/${orgId}/goals/`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -122,12 +125,14 @@ const Goals = () => {
                    className="w-64 pl-10 pr-4 py-2 bg-gray-50 border border-transparent rounded-xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none"
                  />
                </div>
-               <button 
-                onClick={() => navigate('/goals/create')}
-                className="btn-primary py-2.5 px-6 text-sm"
-              >
-                <Plus size={18} /> Create Epic
-              </button>
+               {['owner', 'admin', 'manager'].includes(userRole?.toLowerCase()) && (
+                <button 
+                  onClick={() => navigate('/goals/create')}
+                  className="btn-primary py-2.5 px-6 text-sm"
+                >
+                  <Plus size={18} /> Create New Epic
+                </button>
+              )}
             </div>
           </div>
         </nav>
@@ -270,13 +275,15 @@ const Goals = () => {
                       </td>
                       <td className="py-6 px-8 text-right">
                         <div className="flex justify-end gap-2">
-                          <button 
-                            onClick={(e) => handleDeleteGoal(e, goal.id)}
-                            className="text-gray-300 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                            title="Delete Epic"
-                          >
-                            <AlertCircle size={20} />
-                          </button>
+                          {['owner', 'admin'].includes(userRole?.toLowerCase()) && (
+                            <button 
+                              onClick={(e) => handleDeleteGoal(e, goal.id)}
+                              className="text-gray-300 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                              title="Delete Epic"
+                            >
+                              <Trash2 size={20} />
+                            </button>
+                          )}
                           <button className="text-gray-300 hover:text-gray-900 p-2 rounded-xl hover:bg-gray-100 transition-all opacity-0 group-hover:opacity-100">
                             <MoreHorizontal size={20} />
                           </button>

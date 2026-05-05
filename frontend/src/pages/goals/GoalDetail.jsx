@@ -168,7 +168,7 @@ const GoalDetail = () => {
                  {goal.tasks?.length > 0 ? goal.tasks.map(task => (
                     <div 
                       key={task.id} 
-                      onClick={() => navigate('/tasks')}
+                      onClick={() => navigate(`/tasks/${task.id}`)}
                       className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all cursor-pointer flex items-center justify-between group"
                     >
                        <div className="flex items-center gap-6">

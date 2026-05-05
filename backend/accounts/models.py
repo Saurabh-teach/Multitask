@@ -3,7 +3,6 @@ from django.db import models
 import uuid
 from django.utils import timezone
 
-
 class User(AbstractUser):
     """Main User Table"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -24,7 +23,6 @@ class User(AbstractUser):
     def __str__(self):
         return self.get_full_name() or self.username or str(self.phone)
 
-
 class Organization(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
@@ -42,7 +40,6 @@ class Organization(models.Model):
 
     def __str__(self):
         return self.name
-
 
 class OrganizationMember(models.Model):
     ROLE_CHOICES = [
@@ -64,8 +61,7 @@ class OrganizationMember(models.Model):
         ordering = ['-joined_at']
 
     def save(self, *args, **kwargs):
-        # Check if user is already a member of ANY organization (one job rule)
-        if not self.pk: # Only on creation
+        if not self.pk:
             if OrganizationMember.objects.filter(user=self.user).exists():
                 from django.core.exceptions import ValidationError
                 raise ValidationError(f"User {self.user.username} is already employed at another organization.")
@@ -73,7 +69,6 @@ class OrganizationMember(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.role} in {self.organization}"
-
 
 class OTPVerification(models.Model):
     phone = models.CharField(max_length=15)
@@ -92,7 +87,6 @@ class OTPVerification(models.Model):
     def __str__(self):
         return f"OTP for {self.phone}"
 
-
 class JoinRequest(models.Model):
     STATUS_CHOICES = [('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')]
 
@@ -110,7 +104,6 @@ class JoinRequest(models.Model):
         unique_together = ('organization', 'user')
         ordering = ['-requested_at']
 
-
 class InviteCode(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='invite_codes')
@@ -123,7 +116,6 @@ class InviteCode(models.Model):
 
     def __str__(self):
         return f"{self.code} for {self.organization.name}"
-
 
 class Goal(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -165,12 +157,10 @@ class Goal(models.Model):
         
         self.save()
 
-
 class ActivityLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     
-    # This line is the fix
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='activity_logs')
     
     action = models.CharField(max_length=100)
@@ -181,7 +171,6 @@ class ActivityLog(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-
 
 class Task(models.Model):
     TYPE_CHOICES = [('task', 'Task'), ('story', 'Story'), ('bug', 'Bug')]
@@ -223,7 +212,6 @@ class Task(models.Model):
         self.is_deleted = True
         self.save()
 
-
 class TaskComment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
@@ -235,7 +223,6 @@ class TaskComment(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-
 class TaskAttachment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='attachments')
@@ -246,3 +233,44 @@ class TaskAttachment(models.Model):
 
     def __str__(self):
         return f"{self.file_name} on {self.task.title}"
+
+
+class ChatRoom(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, blank=True, null=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="chat_rooms")
+    is_group = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name or f"ChatRoom {self.id}"
+
+
+class ChatRoomMember(models.Model):
+    chatroom = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="chat_memberships")
+    role = models.CharField(max_length=10, choices=(("admin", "Admin"), ("member", "Member")), default="member")
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("chatroom", "user")
+
+
+class Message(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    chatroom = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
+    content = models.TextField(blank=True, null=True)
+    message_type = models.CharField(max_length=10, choices=(("text", "Text"), ("image", "Image"), ("file", "File")), default="text")
+    file = models.FileField(upload_to="chat_files/", blank=True, null=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+
+class UserPresence(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="presence")
+    is_online = models.BooleanField(default=False)
+    last_seen = models.DateTimeField(auto_now=True)

@@ -1,17 +1,15 @@
 from rest_framework import serializers
 from .models import (
     User, Organization, OrganizationMember, OTPVerification, 
-    JoinRequest, Goal, Task, TaskComment, TaskAttachment, ActivityLog
+    JoinRequest, Goal, Task, TaskComment, TaskAttachment, ActivityLog,
+    ChatRoom, Message, ChatRoomMember
 )
 
-
-# ====================== AUTH ======================
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'phone', 
                   'city', 'job_title', 'department', 'profile_picture', 'bio']
-
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
@@ -46,14 +44,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
 
-
 class OTPVerificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = OTPVerification
         fields = ['phone', 'otp', 'purpose']
 
-
-# ====================== ORGANIZATION ======================
 class OrganizationSerializer(serializers.ModelSerializer):
     member_count = serializers.SerializerMethodField()
 
@@ -65,7 +60,6 @@ class OrganizationSerializer(serializers.ModelSerializer):
     def get_member_count(self, obj):
         return obj.members.filter(is_active=True).count()
 
-
 class OrganizationMemberSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     
@@ -73,8 +67,6 @@ class OrganizationMemberSerializer(serializers.ModelSerializer):
         model = OrganizationMember
         fields = ['id', 'user', 'role', 'joined_at', 'is_active']
 
-
-# ====================== JOIN REQUEST ======================
 class JoinRequestSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     organization = OrganizationSerializer(read_only=True)
@@ -85,14 +77,11 @@ class JoinRequestSerializer(serializers.ModelSerializer):
                   'requested_at', 'reviewed_at']
         read_only_fields = ['status', 'reviewed_at']
 
-
 class JoinRequestCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = JoinRequest
         fields = ['organization', 'message']
 
-
-# ====================== PHASE 3 - GOALS & TASKS ======================
 class GoalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Goal
@@ -101,16 +90,17 @@ class GoalSerializer(serializers.ModelSerializer):
                   'created_at', 'updated_at']
         read_only_fields = ['progress', 'created_at', 'updated_at']
 
-
 class TaskCommentSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
     user_id = serializers.UUIDField(source='user.id', read_only=True)
 
     class Meta:
         model = TaskComment
-        fields = ['id', 'task', 'user_id', 'user_name', 'comment', 'created_at']
+        fields = ['id', 'task', 'user', 'user_id', 'user_name', 'comment', 'created_at']
         read_only_fields = ['user_id', 'user_name', 'created_at']
-
+        extra_kwargs = {
+            'user': {'write_only': True}
+        }
 
 class TaskSerializer(serializers.ModelSerializer):
     assignees = serializers.PrimaryKeyRelatedField(
@@ -137,7 +127,6 @@ class TaskSerializer(serializers.ModelSerializer):
             return obj.updated_at.strftime("%d %b %Y")
         return None
 
-
 class TaskUpdateSerializer(serializers.ModelSerializer):
     assignees = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), 
@@ -149,7 +138,6 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
         model = Task
         fields = ['title', 'description', 'status', 'priority', 
                   'due_date', 'estimated_hours', 'assignees']
-
 
 class TaskDetailSerializer(serializers.ModelSerializer):
     comments = TaskCommentSerializer(many=True, read_only=True)
@@ -165,7 +153,6 @@ class TaskDetailSerializer(serializers.ModelSerializer):
         return [{"id": user.id, "name": user.get_full_name() or user.username} 
                 for user in obj.assignees.all()]
 
-
 class GoalDetailSerializer(serializers.ModelSerializer):
     tasks = serializers.SerializerMethodField()
     owner_name = serializers.CharField(source='owner.get_full_name', read_only=True)
@@ -179,15 +166,12 @@ class GoalDetailSerializer(serializers.ModelSerializer):
     def get_tasks(self, obj):
         return TaskSerializer(obj.tasks.all(), many=True).data
     
-    
-    
 class TaskAttachmentSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
 
     class Meta:
         model = TaskAttachment
         fields = ['id', 'task', 'file', 'file_name', 'uploaded_by_name', 'uploaded_at']
-
 
 class ActivityLogSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
@@ -197,6 +181,38 @@ class ActivityLogSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'user_name', 'action', 'target_type', 
                   'target_id', 'description', 'created_at']
 
-
 class SearchSerializer(serializers.Serializer):
     query = serializers.CharField(required=True)    
+
+
+class ChatUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name']
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender = ChatUserSerializer(read_only=True)
+    
+    class Meta:
+        model = Message
+        fields = ['id', 'chatroom', 'sender', 'content', 'message_type', 'file', 'created_at']
+
+class ChatRoomSerializer(serializers.ModelSerializer):
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatRoom
+        fields = ['id', 'name', 'organization', 'is_group', 'created_at', 'last_message']
+        read_only_fields = ['organization']
+
+    def get_last_message(self, obj):
+        last_msg = obj.messages.all().order_by('-created_at').first()
+        if last_msg:
+            return MessageSerializer(last_msg).data
+        return None
+
+class ChatRoomMemberSerializer(serializers.ModelSerializer):
+    user = ChatUserSerializer(read_only=True)
+    class Meta:
+        model = ChatRoomMember
+        fields = ['id', 'chatroom', 'user', 'role', 'joined_at']

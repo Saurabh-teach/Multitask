@@ -19,6 +19,7 @@ const Tasks = () => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [userRole, setUserRole] = useState('member');
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -52,14 +53,16 @@ const Tasks = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const orgId = orgRes.data.organizations?.[0]?.organization_id || orgRes.data.organizations?.[0]?.id;
-      if (orgId) {
-        const res = await axios.get(
-          `http://127.0.0.1:8000/api/auth/organizations/${orgId}/tasks/`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        
-        let allTasks = res.data || [];
+        const currentOrg = orgRes.data.organizations?.[0];
+        const orgId = currentOrg?.organization_id || currentOrg?.id;
+        if (orgId) {
+          setUserRole(currentOrg.role || 'member');
+          const res = await axios.get(
+            `http://127.0.0.1:8000/api/auth/organizations/${orgId}/tasks/`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          let allTasks = res.data || [];
         if (filterMemberId) {
             allTasks = allTasks.filter(t => t.assignees.includes(filterMemberId));
         }
@@ -184,12 +187,14 @@ const Tasks = () => {
                   className="pl-10 pr-4 py-2.5 bg-gray-50 border border-transparent rounded-2xl text-[14px] w-80 focus:bg-white focus:border-blue-500 transition-all outline-none"
                 />
               </div>
+              {['owner', 'admin', 'manager'].includes(userRole?.toLowerCase()) && (
               <button 
                 onClick={() => navigate('/tasks/create')}
                 className="btn-primary py-2.5 px-6 text-sm"
               >
-                <Plus size={18} /> Create Issue
+                <Plus size={18} /> Create New Task
               </button>
+            )}
             </div>
           </div>
         </nav>

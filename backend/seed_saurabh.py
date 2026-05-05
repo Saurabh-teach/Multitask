@@ -11,7 +11,6 @@ from accounts.models import User, Organization, OrganizationMember, Goal, Task
 def seed_saurabh_org():
     print("Seeding Saurabh's Organization...")
     
-    # Target Org
     org_id = '6f0ed70b-f82d-4f1c-8ac5-7d45970ebe71'
     try:
         org = Organization.objects.get(id=org_id)
@@ -20,11 +19,13 @@ def seed_saurabh_org():
         print(f"Error: {e}")
         return
 
-    # 1. Add some employees
     employees_data = [
         {'username': 'rahul_dev', 'email': 'rahul@goalflow.com', 'first_name': 'Rahul', 'last_name': 'Mehta', 'job_title': 'Frontend Engineer'},
         {'username': 'priya_pm', 'email': 'priya@goalflow.com', 'first_name': 'Priya', 'last_name': 'Sharma', 'job_title': 'Product Manager'},
         {'username': 'amit_backend', 'email': 'amit@goalflow.com', 'first_name': 'Amit', 'last_name': 'Verma', 'job_title': 'Backend Developer'},
+        {'username': 'neha_qa', 'email': 'neha@goalflow.com', 'first_name': 'Neha', 'last_name': 'Kapoor', 'job_title': 'QA Engineer'},
+        {'username': 'vikram_devops', 'email': 'vikram@goalflow.com', 'first_name': 'Vikram', 'last_name': 'Singh', 'job_title': 'DevOps Specialist'},
+        {'username': 'sneha_ux', 'email': 'sneha@goalflow.com', 'first_name': 'Sneha', 'last_name': 'Reddy', 'job_title': 'UX Designer'},
     ]
 
     employees = []
@@ -43,7 +44,6 @@ def seed_saurabh_org():
             user.set_password('Emp@1234')
             user.save()
         
-        # Add to Organization
         OrganizationMember.objects.get_or_create(
             organization=org,
             user=user,
@@ -52,13 +52,12 @@ def seed_saurabh_org():
         employees.append(user)
         print(f"Added employee: {user.username}")
 
-    # 2. Add Goals
     goal1, _ = Goal.objects.get_or_create(
         organization=org,
         title="Scale Infrastructure to 100k Users",
         defaults={
             'description': 'Optimize database and caching for high traffic.',
-            'owner': employees[2], # Amit
+            'owner': employees[2],
             'progress': 30.0
         }
     )
@@ -68,12 +67,11 @@ def seed_saurabh_org():
         title="Redesign User Onboarding Flow",
         defaults={
             'description': 'Improve conversion rate by simplifying registration.',
-            'owner': employees[1], # Priya
+            'owner': employees[1],
             'progress': 15.0
         }
     )
 
-    # 3. Add and Assign Tasks
     tasks_data = [
         {'goal': goal1, 'title': 'Implement Redis Caching', 'assignee': employees[2], 'status': 'in_progress', 'priority': 'high'},
         {'goal': goal1, 'title': 'Database Migration to Aurora', 'assignee': employees[2], 'status': 'todo', 'priority': 'urgent'},

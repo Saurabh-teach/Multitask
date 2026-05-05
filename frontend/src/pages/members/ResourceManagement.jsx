@@ -20,6 +20,7 @@ const ResourceManagement = () => {
   const [organizationName, setOrganizationName] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [userRole, setUserRole] = useState('member');
   
   // Assignment Modal State
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -52,6 +53,7 @@ const ResourceManagement = () => {
       const orgId = myOrgs?.[0]?.organization_id || myOrgs?.[0]?.id;
       if (orgId) {
         setCurrentOrgId(orgId);
+        setUserRole(myOrgs[0].role || 'member');
         setAssignmentData(prev => ({ ...prev, organization_id: orgId }));
         fetchTeamMembers(orgId);
       }
@@ -177,7 +179,7 @@ const ResourceManagement = () => {
                <div>
                   <h1 className="text-2xl font-bold text-gray-900 brand-font tracking-tight">Workforce Allocation</h1>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                    Manage Resource Capacity & Utilization
+                    Manage Team Capacity & Performance
                   </p>
                </div>
             </div>
@@ -193,29 +195,22 @@ const ResourceManagement = () => {
                   className="pl-10 pr-4 py-2.5 bg-gray-50 border border-transparent rounded-2xl text-[14px] w-80 focus:bg-white focus:border-blue-500 transition-all outline-none"
                 />
               </div>
-              <button 
-                onClick={() => navigate('/members/invite')}
-                className="btn-primary py-2.5 px-6 text-sm"
-              >
-                <UserPlus size={18} /> Invite Talent
-              </button>
+              {['owner', 'admin', 'manager'].includes(userRole?.toLowerCase()) && (
+                <button 
+                  onClick={() => navigate('/members/invite')}
+                  className="btn-primary py-2.5 px-6 text-sm"
+                >
+                  <UserPlus size={18} /> Invite Talent
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="px-10 flex gap-8">
-             <button 
-               onClick={() => setActiveTab('team')}
-               className={`py-4 text-sm font-bold uppercase tracking-widest border-b-2 transition-all ${activeTab === 'team' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-             >
-                Team Members ({members.length})
-             </button>
-             <button 
-               onClick={() => setActiveTab('talent')}
-               className={`py-4 text-sm font-bold uppercase tracking-widest border-b-2 transition-all ${activeTab === 'talent' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-             >
-                Global Talent Pool ({talent.length})
-             </button>
+          {/* Single View Info */}
+          <div className="px-10 py-2">
+             <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                Active Organization Members ({members.length})
+             </span>
           </div>
         </nav>
 
@@ -237,7 +232,7 @@ const ResourceManagement = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {(activeTab === 'team' ? filteredTeam : filteredTalent).map((person) => (
+                    {filteredTeam.map((person) => (
                       <tr key={person.member_id || person.id} className="group hover:bg-blue-50/20 transition-all">
                         <td className="py-6 px-10">
                           <div className="flex items-center gap-4">
@@ -290,12 +285,14 @@ const ResourceManagement = () => {
                            )}
                         </td>
                         <td className="py-6 px-10 text-right">
-                           <button 
-                             onClick={() => handleOpenAssignModal(person)}
-                             className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all flex items-center gap-2 ml-auto shadow-sm"
-                           >
-                              <Plus size={14} /> {activeTab === 'team' ? 'Assign Work' : 'Hire & Assign'}
-                           </button>
+                           {['owner', 'admin', 'manager'].includes(userRole?.toLowerCase()) && (
+                             <button 
+                               onClick={() => handleOpenAssignModal(person)}
+                               className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all flex items-center gap-2 ml-auto shadow-sm"
+                             >
+                                <Plus size={14} /> Assign Work
+                             </button>
+                           )}
                         </td>
                       </tr>
                     ))}

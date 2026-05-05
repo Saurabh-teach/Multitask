@@ -11,12 +11,16 @@ import Dashboard from './pages/dashboard/Dashboard';
 import Goals from './pages/goals/Goals';
 import Tasks from './pages/tasks/Tasks';
 import ResourceManagement from './pages/members/ResourceManagement';
+import Chat from './pages/chat/Chat';
+import TalentPool from './pages/members/TalentPool';
 import InviteMember from './pages/members/InviteMember';
 import Organizations from './pages/organizations/Organizations';
 import CreateOrganization from './pages/organizations/CreateOrganization';
 import CreateGoal from './pages/goals/CreateGoal';
 import GoalDetail from './pages/goals/GoalDetail';
 import CreateTask from './pages/tasks/CreateTask';
+import TaskDetail from './pages/tasks/TaskDetail';
+import Settings from './pages/settings/Settings';
 
 
 function App() {
@@ -33,13 +37,17 @@ function App() {
           <Route path="/goals" element={<Goals />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/members" element={<ResourceManagement />} />
-          <Route path="/talent-pool" element={<ResourceManagement />} />
+          <Route path="/chat/:orgId" element={<Chat />} />
+          <Route path="/chat/:orgId/:roomId" element={<Chat />} />
+          <Route path="/talent-pool" element={<TalentPool />} />
           <Route path="/members/invite" element={<InviteMember />} />
           <Route path="/organizations" element={<Organizations />} />
           <Route path="/organizations/create" element={<CreateOrganization />} />
           <Route path="/goals/create" element={<CreateGoal />} />
           <Route path="/goals/:goalId" element={<GoalDetail />} />
           <Route path="/tasks/create" element={<CreateTask />} />
+          <Route path="/tasks/:id" element={<TaskDetail />} />
+          <Route path="/settings" element={<Settings />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

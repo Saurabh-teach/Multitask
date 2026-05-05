@@ -12,7 +12,6 @@ from accounts.models import User, Organization, OrganizationMember, Goal, Task
 def seed_db():
     print("Starting Enterprise-Grade Database Seeding...")
     
-    # 1. Create Professional Users
     users_data = [
         {'username': 'Saurabh101', 'email': f'saurabh_{uuid.uuid4().hex[:4]}@goalflow.com', 'first_name': 'Saurabh', 'last_name': 'Sharma', 'job_title': 'Product Owner', 'department': 'Management'},
         {'username': 'AmitDev', 'email': f'amit_{uuid.uuid4().hex[:4]}@goalflow.com', 'first_name': 'Amit', 'last_name': 'Verma', 'job_title': 'Senior Engineer', 'department': 'Engineering'},
@@ -20,7 +19,6 @@ def seed_db():
         {'username': 'RahulQA', 'email': f'rahul_{uuid.uuid4().hex[:4]}@goalflow.com', 'first_name': 'Rahul', 'last_name': 'Kumar', 'job_title': 'QA Lead', 'department': 'Quality'},
     ]
 
-    # Create the specific requested user
     s_user, created = User.objects.get_or_create(
         username='Saurabh_B',
         defaults={
@@ -34,7 +32,6 @@ def seed_db():
         s_user.set_password('Saurabh@123')
         s_user.save()
     
-    # Create "Unassigned" Talent
     talent_data = [
         {'username': 'Vikram_Cloud', 'email': 'vikram@talent.com', 'first_name': 'Vikram', 'last_name': 'Rao', 'job_title': 'DevOps Architect'},
         {'username': 'Ananya_Data', 'email': 'ananya@talent.com', 'first_name': 'Ananya', 'last_name': 'Das', 'job_title': 'Data Scientist'},
@@ -63,7 +60,6 @@ def seed_db():
     owner = users[0]
     team = users[1:]
 
-    # 2. Create Professional Organization
     org, created = Organization.objects.get_or_create(
         name="Global Tech Solutions",
         defaults={
@@ -75,12 +71,10 @@ def seed_db():
     )
     print(f"Workspace: {org.name}")
 
-    # 3. Setup Team Structure
     OrganizationMember.objects.get_or_create(organization=org, user=owner, defaults={'role': 'owner'})
     for member in team:
         OrganizationMember.objects.get_or_create(organization=org, user=member, defaults={'role': 'member'})
 
-    # 4. Create Strategic Epics (Goals)
     epics_data = [
         {
             'title': "Q3 SaaS Platform Overhaul",
@@ -114,16 +108,13 @@ def seed_db():
         epics.append(epic)
     print("Strategic Epics Established.")
 
-    # 5. Create Detailed Tasks (Sprint Items)
     tasks_data = [
-        # SaaS Overhaul Tasks
         {'title': "Implement OAuth2.0 SSO", 'status': 'done', 'pri': 'urgent', 'type': 'task', 'epic': epics[0], 'assignee': users[1]},
         {'title': "Redesign Dashboard Layout", 'status': 'in_review', 'pri': 'high', 'type': 'story', 'epic': epics[0], 'assignee': users[2]},
         {'title': "Database Migration to PostgreSQL", 'status': 'in_progress', 'pri': 'high', 'type': 'task', 'epic': epics[0], 'assignee': users[1]},
         {'title': "Setup CI/CD Pipeline", 'status': 'todo', 'pri': 'medium', 'type': 'task', 'epic': epics[0], 'assignee': users[3]},
         {'title': "Fix CSS break on Safari", 'status': 'testing', 'pri': 'high', 'type': 'bug', 'epic': epics[0], 'assignee': users[2]},
         
-        # Expansion Tasks
         {'title': "GDPR Data Processing Audit", 'status': 'backlog', 'pri': 'urgent', 'type': 'task', 'epic': epics[1], 'assignee': users[1]},
         {'title': "Localized Landing Pages (FR/DE)", 'status': 'todo', 'pri': 'medium', 'type': 'story', 'epic': epics[1], 'assignee': users[2]},
     ]
@@ -141,7 +132,6 @@ def seed_db():
         )
         task.assignees.add(t['assignee'])
     
-    # 6. Final Progress Sync
     for epic in epics:
         epic.update_progress()
 

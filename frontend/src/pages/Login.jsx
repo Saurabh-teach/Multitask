@@ -3,9 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Mail, Lock, ArrowRight, Target, ShieldCheck } from 'lucide-react';
+import { AuthContext } from '../context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = React.useContext(AuthContext);
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -17,8 +19,19 @@ const Login = () => {
     setLoading(true);
     try {
       const response = await axios.post('http://127.0.0.1:8000/api/auth/login/', formData);
-      const { phone, dev_otp, dev_note } = response.data;
+      const { phone, dev_otp, token, step } = response.data;
       
+      if (step === 'dashboard' && token) {
+        toast.success("Welcome back!");
+        // Commit session first
+        login(token);
+        // Small delay to ensure state propagates
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 100);
+        return;
+      }
+
       if (dev_otp) {
         toast.success(`Dev Mode: Your OTP is ${dev_otp}`, { duration: 10000, icon: '🔑' });
       } else {

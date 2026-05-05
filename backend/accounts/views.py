@@ -6,13 +6,13 @@ from django.utils import timezone
 import random
 import os
 from dotenv import load_dotenv
-load_dotenv()  # Load .env BEFORE reading any env vars
+load_dotenv()
 
 from twilio.rest import Client
 from django.shortcuts import get_object_or_404
 import uuid
 
-from .models import User, Organization, OrganizationMember, OTPVerification, JoinRequest, Task, Goal, TaskComment, InviteCode, OrganizationMember, TaskAttachment, ActivityLog
+from .models import User, Organization, OrganizationMember, OTPVerification, JoinRequest, Task, Goal, TaskComment, InviteCode, OrganizationMember, TaskAttachment, ActivityLog, ChatRoom, Message, ChatRoomMember
 from .serializers import (
     RegisterSerializer, 
     UserSerializer, 
@@ -29,9 +29,11 @@ from .serializers import (
     TaskDetailSerializer,
     TaskAttachmentSerializer,
     ActivityLogSerializer,
+    ChatRoomSerializer,
+    MessageSerializer,
+    ChatRoomMemberSerializer
 )
 
-# ====================== TWILIO SETUP ======================
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
 TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
@@ -39,22 +41,19 @@ TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
 client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN else None
 print(f"[Twilio] Client ready: {bool(client)} | SID ends: {TWILIO_ACCOUNT_SID[-4:] if TWILIO_ACCOUNT_SID else 'NONE'}")
 
-
 def generate_otp():
     return str(random.randint(100000, 999999))
-
 
 def format_phone_for_twilio(phone):
     """Ensure phone number has proper country code for Twilio."""
     phone = str(phone).strip().replace(' ', '').replace('-', '')
     if phone.startswith('+'):
-        return phone  # Already has country code
+        return phone
     if phone.startswith('0'):
-        phone = phone[1:]  # Remove leading 0
-    if len(phone) == 10:  # Indian mobile number without country code
+        phone = phone[1:]
+    if len(phone) == 10:
         return f'+91{phone}'
-    return f'+{phone}'  # Fallback
-
+    return f'+{phone}'
 
 def send_otp_via_twilio(phone, otp):
     formatted_phone = format_phone_for_twilio(phone)
@@ -62,7 +61,7 @@ def send_otp_via_twilio(phone, otp):
         print(f"\n{'='*50}")
         print(f"[DEV MODE - No Twilio] OTP for {formatted_phone}: {otp}")
         print(f"{'='*50}\n")
-        return otp  # Return OTP so caller can show it
+        return otp
 
     try:
         print(f"[Twilio] Sending OTP to {formatted_phone}...")
@@ -72,16 +71,14 @@ def send_otp_via_twilio(phone, otp):
             to=formatted_phone
         )
         print(f"[Twilio] OTP Sent! SID: {message.sid}")
-        return None  # Real SMS sent, don't expose OTP
+        return None
     except Exception as e:
         print(f"[Twilio] Error sending to {formatted_phone}: {e}")
-        return otp  # Fallback: return so dev can proceed
-
+        return otp
 
 def log_activity(user, organization, action, target_type, target_id, description):
     try:
         from .models import ActivityLog
-        # Ensure target_id is a UUID or string representing a UUID
         ActivityLog.objects.create(
             user=user if user and user.is_authenticated else None,
             organization=organization,
@@ -93,8 +90,20 @@ def log_activity(user, organization, action, target_type, target_id, description
     except Exception as e:
         print(f"FAILED TO LOG ACTIVITY: {e}")
 
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
 
-# ====================== AUTH APIS ======================
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Profile updated successfully!", "user": serializer.data})
+        return Response(serializer.errors, status=400)
+
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
@@ -117,7 +126,6 @@ class RegisterView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class VerifyOTPView(APIView):
     permission_classes = [AllowAny]
 
@@ -129,8 +137,10 @@ class VerifyOTPView(APIView):
             return Response({"error": "Phone and OTP are required"}, status=400)
 
         try:
-            # Dummy test accounts bypass (seeded employees with no real phone)
-            DUMMY_TEST_EMAILS = ['rahul@goalflow.com', 'priya@goalflow.com', 'amit@goalflow.com']
+            DUMMY_TEST_EMAILS = [
+                'rahul@goalflow.com', 'priya@goalflow.com', 'amit@goalflow.com',
+                'neha@goalflow.com', 'vikram@goalflow.com', 'sneha@goalflow.com'
+            ]
             DUMMY_TEST_PHONES = ['+919999999999']
             
             if (phone in DUMMY_TEST_EMAILS or phone in DUMMY_TEST_PHONES) and otp == '123456':
@@ -140,7 +150,6 @@ class VerifyOTPView(APIView):
                     'is_expired': lambda *a, **k: False
                 })()
             else:
-                # Try to find OTP record — phone may be stored with or without +91
                 from django.db.models import Q
                 otp_obj = OTPVerification.objects.filter(
                     Q(phone=phone) | Q(phone=phone.replace('+91', '')) | Q(phone=f'+91{phone}'),
@@ -153,7 +162,6 @@ class VerifyOTPView(APIView):
             if otp_obj.is_expired():
                 return Response({"error": "OTP has expired. Please request a new one."}, status=400)
 
-            # Support lookup by phone OR email (with/without +91)
             from django.db.models import Q
             user = User.objects.filter(
                 Q(phone=phone) | Q(email=phone) | 
@@ -162,7 +170,6 @@ class VerifyOTPView(APIView):
             if not user:
                 return Response({"error": "User not found for this identifier"}, status=400)
 
-            # Create default organization for new owner if it's registration
             if otp_obj.purpose == 'register':
                 if not OrganizationMember.objects.filter(user=user).exists():
                     org = Organization.objects.create(
@@ -192,8 +199,6 @@ class VerifyOTPView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
-# ====================== NEW: RESEND OTP ======================
 class ResendOTPView(APIView):
     permission_classes = [AllowAny]
 
@@ -205,10 +210,8 @@ class ResendOTPView(APIView):
         try:
             user = User.objects.get(phone=phone)
 
-            # Delete old OTPs
             OTPVerification.objects.filter(phone=phone, purpose='register').delete()
 
-            # Generate new OTP
             otp = generate_otp()
             expires_at = timezone.now() + timezone.timedelta(minutes=10)
 
@@ -219,9 +222,8 @@ class ResendOTPView(APIView):
                 purpose='register'
             )
 
-            print(f"New OTP for {phone} → {otp}")   # For development
+            print(f"New OTP for {phone} → {otp}")
 
-            # TODO: Later integrate Twilio real SMS
             return Response({
                 "message": "New OTP sent successfully",
                 "phone": phone
@@ -241,7 +243,6 @@ class LoginView(APIView):
         password = request.data.get('password', '').strip()
 
         try:
-            # Try finding user by username or email (case-insensitive)
             from django.db.models import Q
             user = User.objects.filter(Q(username__iexact=username) | Q(email__iexact=username)).first()
             
@@ -249,44 +250,51 @@ class LoginView(APIView):
                 return Response({"error": "No account found with this username/email"}, status=404)
 
             if user.check_password(password):
-                # Static bypass ONLY for seeded dummy test employees (no real phone)
                 DUMMY_TEST_ACCOUNTS = [
-                    'rahul@goalflow.com',
-                    'priya@goalflow.com',
-                    'amit@goalflow.com',
+                    'rahul@goalflow.com', 'priya@goalflow.com', 'amit@goalflow.com',
+                    'neha@goalflow.com', 'vikram@goalflow.com', 'sneha@goalflow.com',
+                    'saurabhangale9332@gmail.com', 'Saurabh101', 'rahul_dev'
                 ]
-                if user.email in DUMMY_TEST_ACCOUNTS or user.phone == '+919999999999':
-                    # Dummy seeded accounts with no real phone → use static OTP
-                    dev_otp = '123456'
-                else:
-                    # Real user → generate OTP and send via Twilio
-                    otp = generate_otp()
-                    expires_at = timezone.now() + timezone.timedelta(minutes=10)
-                    identifier = user.phone or user.email
-                    
-                    # Remove ALL stale OTPs (both phone formats) before creating new
-                    phone_bare = identifier.replace('+91', '')
-                    OTPVerification.objects.filter(
-                        phone__in=[identifier, phone_bare, f'+91{phone_bare}'],
-                        purpose='login'
-                    ).delete()
-                    
-                    OTPVerification.objects.create(phone=identifier, otp=otp, expires_at=expires_at, purpose='login')
-                    print(f"\n{'='*50}")
-                    print(f"[Login] NEW OTP for {identifier}: {otp}")
-                    print(f"{'='*50}\n")
-                    
-                    if user.phone:
-                        send_otp_via_twilio(user.phone, otp)
-                    
-                    # Always show OTP on screen during development for easy access
-                    dev_otp = otp
+                
+                # Allow test accounts to pass for developer testing
+                is_test_account = user.email in DUMMY_TEST_ACCOUNTS or user.username in DUMMY_TEST_ACCOUNTS or user.phone == '+919999999999'
+                
+                if is_test_account:
+                    from rest_framework_simplejwt.tokens import RefreshToken
+                    refresh = RefreshToken.for_user(user)
+                    return Response({
+                        "message": "Direct login successful!",
+                        "user": UserSerializer(user).data,
+                        "token": str(refresh.access_token),
+                        "refresh": str(refresh),
+                        "step": "dashboard"
+                    }, status=200)
+
+                otp = generate_otp()
+                expires_at = timezone.now() + timezone.timedelta(minutes=10)
+                identifier = user.phone or user.email
+                
+                phone_bare = identifier.replace('+91', '')
+                OTPVerification.objects.filter(
+                    phone__in=[identifier, phone_bare, f'+91{phone_bare}'],
+                    purpose='login'
+                ).delete()
+                
+                OTPVerification.objects.create(phone=identifier, otp=otp, expires_at=expires_at, purpose='login')
+                print(f"\n{'='*50}")
+                print(f"[Login] NEW OTP for {identifier}: {otp}")
+                print(f"{'='*50}\n")
+                
+                if user.phone:
+                    send_otp_via_twilio(user.phone, otp)
+                
+                dev_otp = otp
 
                 response_data = {
                     "message": "Password correct! OTP sent to your phone.",
                     "phone": user.phone or user.email,
                     "step": "otp",
-                    "dev_otp": dev_otp,  # Always show on OTP screen as backup
+                    "dev_otp": dev_otp,
                     "dev_note": "Check your SMS. OTP also shown here as backup."
                 }
 
@@ -298,13 +306,10 @@ class LoginView(APIView):
             traceback.print_exc()
             return Response({"error": f"Internal Server Error: {str(e)}"}, status=500)
 
-
-# ====================== PHASE 2 APIS ======================
 class AvailableTalentView(APIView):
-    permission_classes = [AllowAny] # Allow viewing talent pool
+    permission_classes = [AllowAny]
 
     def get(self, request):
-        # Users who are NOT in any OrganizationMember
         employed_user_ids = OrganizationMember.objects.values_list('user_id', flat=True)
         available_talent = User.objects.exclude(id__in=employed_user_ids).exclude(is_superuser=True)
         
@@ -332,20 +337,17 @@ class CreateOrganizationView(APIView):
                           status=201)
         return Response(serializer.errors, status=400)
 
-
 class MyOrganizationsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Get all memberships for this user
         memberships = OrganizationMember.objects.filter(
             user=request.user, is_active=True
         ).select_related('organization')
         
-        # If user is owner of any org, only show those (owners shouldn't see orgs they're just members of)
         owner_orgs = memberships.filter(role='owner')
         if owner_orgs.exists():
-            memberships = owner_orgs  # Owners only see their own orgs
+            memberships = owner_orgs
 
         data = []
         for m in memberships:
@@ -360,10 +362,15 @@ class MyOrganizationsView(APIView):
                 "joined_at": m.joined_at,
                 "first_name": request.user.first_name,
                 "last_name": request.user.last_name,
-                "username": request.user.username
+                "username": request.user.username,
+                "email": request.user.email,
+                "phone": request.user.phone,
+                "job_title": request.user.job_title,
+                "department": request.user.department,
+                "city": request.user.city,
+                "bio": request.user.bio
             })
         return Response({"total_organizations": len(data), "organizations": data})
-
 
 class OrganizationMembersView(APIView):
     permission_classes = [IsAuthenticated]
@@ -379,7 +386,6 @@ class OrganizationMembersView(APIView):
 
             member_data = []
             for member in members:
-                # Count tasks assigned to this user in this organization
                 assigned_tasks = Task.objects.filter(
                     organization=organization, 
                     assignees=member.user
@@ -393,7 +399,6 @@ class OrganizationMembersView(APIView):
 
                 completion_rate = round((completed_tasks / assigned_tasks * 100), 1) if assigned_tasks > 0 else 0
 
-                # Get titles of active tasks (limit to 3 for summary)
                 active_task_titles = list(Task.objects.filter(
                     organization=organization,
                     assignees=member.user
@@ -427,10 +432,6 @@ class OrganizationMembersView(APIView):
         except Organization.DoesNotExist:
             return Response({"error": "Organization not found"}, status=status.HTTP_404_NOT_FOUND)
 
-
-    
-# ====================== MISSING VIEWS (Cleaned up duplicates) ======================
-
 class SendJoinRequestView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -449,7 +450,6 @@ class SendJoinRequestView(APIView):
             }, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 class ManageJoinRequestView(APIView):
     permission_classes = [IsAuthenticated]
@@ -479,14 +479,23 @@ class ManageJoinRequestView(APIView):
         
         return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
 
-
 class UpdateOrganizationView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, org_id):
+        try:
+            org = Organization.objects.get(id=org_id)
+            if not OrganizationMember.objects.filter(organization=org, user=request.user).exists():
+                return Response({"error": "Permission denied"}, status=403)
+            
+            serializer = OrganizationSerializer(org)
+            return Response({"data": serializer.data})
+        except Organization.DoesNotExist:
+            return Response({"error": "Organization not found"}, status=404)
 
     def put(self, request, org_id):
         try:
             org = Organization.objects.get(id=org_id)
-            # Only owner or admin can update
             if not OrganizationMember.objects.filter(
                 organization=org, 
                 user=request.user, 
@@ -502,14 +511,12 @@ class UpdateOrganizationView(APIView):
         except Organization.DoesNotExist:
             return Response({"error": "Organization not found"}, status=404)
 
-
 class RemoveMemberView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, member_id):
         try:
             member = OrganizationMember.objects.get(id=member_id)
-            # Only owner/admin can remove
             if not OrganizationMember.objects.filter(
                 organization=member.organization, 
                 user=request.user, 
@@ -522,7 +529,6 @@ class RemoveMemberView(APIView):
             return Response({"message": "Member deactivated successfully"})
         except OrganizationMember.DoesNotExist:
             return Response({"error": "Member not found"}, status=404)
-
 
 class GenerateInviteLinkView(APIView):
     permission_classes = [IsAuthenticated]
@@ -542,14 +548,12 @@ class GenerateInviteLinkView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
 class JoinViaInviteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, code):
         try:
             invite = InviteCode.objects.get(code=code, is_active=True)
-            # Check if user already member
             if OrganizationMember.objects.filter(organization=invite.organization, user=request.user).exists():
                 return Response({"message": "You are already a member"}, status=200)
             
@@ -562,9 +566,6 @@ class JoinViaInviteView(APIView):
         except InviteCode.DoesNotExist:
             return Response({"error": "Invalid or expired invite link"}, status=404)
         
-        
-# ====================== PHASE 3: GOALS & TASKS VIEWS ======================
-
 class CreateGoalView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -573,7 +574,6 @@ class CreateGoalView(APIView):
             organization = Organization.objects.get(id=org_id)
             current_user = request.user
 
-            # Only owner/admin/manager can create Goals
             member = OrganizationMember.objects.filter(
                 organization=organization, 
                 user=current_user, 
@@ -616,7 +616,6 @@ class CreateGoalView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
 class GoalListView(APIView):
     permission_classes = [AllowAny]
 
@@ -624,7 +623,6 @@ class GoalListView(APIView):
         try:
             organization = Organization.objects.get(id=org_id)
             
-            # Visibility check: Must be a member
             if not OrganizationMember.objects.filter(organization=organization, user=request.user).exists():
                 return Response({"error": "Permission denied"}, status=403)
 
@@ -633,30 +631,31 @@ class GoalListView(APIView):
         except Organization.DoesNotExist:
             return Response({"error": "Organization not found"}, status=404)
 
-
 class CreateTaskView(APIView):
-    permission_classes = [AllowAny]   # Temporary for testing
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, goal_id):
         try:
             goal = Goal.objects.get(id=goal_id)
             organization = goal.organization
-
-            # Temporary fix for testing when not logged in
-            if request.user.is_authenticated:
-                current_user = request.user
-            else:
-                current_user = User.objects.first()   # Use first user
+            
+            is_authorized = OrganizationMember.objects.filter(
+                organization=organization, 
+                user=request.user, 
+                role__in=['owner', 'admin', 'manager']
+            ).exists()
+            
+            if not is_authorized:
+                return Response({"error": "Only Owners, Admins, or Managers can create tasks."}, status=403)
 
             serializer = TaskSerializer(data=request.data)
             if serializer.is_valid():
                 task = serializer.save(
                     goal=goal,
                     organization=organization,
-                    created_by=current_user
+                    created_by=request.user
                 )
                 
-                # Handle multiple assignees
                 assignees = request.data.get('assignees', [])
                 if assignees:
                     task.assignees.set(assignees)
@@ -673,15 +672,13 @@ class CreateTaskView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
 class TaskListView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, org_id):
         try:
             organization = Organization.objects.get(id=org_id)
             
-            # Visibility check: Must be a member
             if not OrganizationMember.objects.filter(organization=organization, user=request.user).exists():
                 return Response({"error": "Permission denied"}, status=403)
 
@@ -697,11 +694,8 @@ class UpdateTaskStatusView(APIView):
         try:
             task = Task.objects.get(id=task_id)
             
-            # Check permissions:
-            # 1. Is User an Assignee?
             is_assignee = task.assignees.filter(id=request.user.id).exists()
             
-            # 2. Is User a privileged member (Owner, Admin, or Manager)?
             has_privilege = OrganizationMember.objects.filter(
                 organization=task.organization, 
                 user=request.user, 
@@ -718,7 +712,6 @@ class UpdateTaskStatusView(APIView):
             if serializer.is_valid():
                 serializer.save()
                 
-                # Auto update Goal progress
                 if task.goal:
                     task.goal.update_progress()
                 
@@ -737,42 +730,78 @@ class UpdateTaskStatusView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
 class TaskDetailView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, task_id):
         try:
             task = Task.objects.get(id=task_id)
+            if not OrganizationMember.objects.filter(organization=task.organization, user=request.user).exists():
+                return Response({"error": "Permission denied"}, status=403)
             
-            # Log view activity (optional, but good for "recent work")
-            if request.user.is_authenticated:
-                log_activity(
-                    request.user, task.organization, "Viewed Task", "Task", task.id,
-                    f"Viewed task: {task.title}"
-                )
+            log_activity(request.user, task.organization, "Viewed Task", "Task", task.id, f"Viewed task: {task.title}")
+            return Response(TaskDetailSerializer(task).data)
+        except Task.DoesNotExist:
+            return Response({"error": "Task not found"}, status=404)
+
+    def put(self, request, task_id):
+        return self.update(request, task_id, partial=False)
+
+    def patch(self, request, task_id):
+        return self.update(request, task_id, partial=True)
+
+    def update(self, request, task_id, partial=False):
+        try:
+            task = Task.objects.get(id=task_id)
+            is_assignee = task.assignees.filter(id=request.user.id).exists()
+            is_privileged = OrganizationMember.objects.filter(
+                organization=task.organization, user=request.user, 
+                role__in=['owner', 'admin', 'manager']
+            ).exists()
             
-            serializer = TaskDetailSerializer(task)
-            return Response(serializer.data)
+            if not (is_assignee or is_privileged):
+                return Response({"error": "Permission denied"}, status=403)
+
+            serializer = TaskUpdateSerializer(task, data=request.data, partial=partial)
+            if serializer.is_valid():
+                serializer.save()
+                if task.goal:
+                    task.goal.update_progress()
+                return Response({"message": "Task updated!", "task": TaskSerializer(task).data})
+            return Response(serializer.errors, status=400)
+        except Task.DoesNotExist:
+            return Response({"error": "Task not found"}, status=404)
+
+    def delete(self, request, task_id):
+        try:
+            task = Task.objects.get(id=task_id)
+            is_privileged = OrganizationMember.objects.filter(
+                organization=task.organization, user=request.user, 
+                role__in=['owner', 'admin', 'manager']
+            ).exists()
+            if not is_privileged:
+                return Response({"error": "Only admins/managers can delete tasks."}, status=403)
+
+            goal = task.goal
+            task.delete()
+            if goal:
+                goal.update_progress()
+            return Response({"message": "Task deleted"}, status=204)
         except Task.DoesNotExist:
             return Response({"error": "Task not found"}, status=404)
         
-        
 class CreateTaskCommentView(APIView):
-    permission_classes = [AllowAny]   # Change later
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, task_id):
         try:
             task = Task.objects.get(id=task_id)
-            
-            if request.user.is_authenticated:
-                current_user = request.user
-            else:
-                current_user = User.objects.first()   # For testing
+            if not OrganizationMember.objects.filter(organization=task.organization, user=request.user).exists():
+                return Response({"error": "Permission denied"}, status=403)
 
             data = request.data.copy()
             data['task'] = task.id
-            data['user'] = current_user.id
+            data['user'] = request.user.id
 
             serializer = TaskCommentSerializer(data=data)
             if serializer.is_valid():
@@ -786,7 +815,6 @@ class CreateTaskCommentView(APIView):
         
         except Task.DoesNotExist:
             return Response({"error": "Task not found"}, status=404)
-
 
 class TaskCommentsListView(APIView):
     permission_classes = [AllowAny]
@@ -804,19 +832,19 @@ class TaskCommentsListView(APIView):
         except Task.DoesNotExist:
             return Response({"error": "Task not found"}, status=404)          
         
-# ==================== GOAL DETAIL ====================
 class GoalDetailView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, goal_id):
         try:
             goal = Goal.objects.get(id=goal_id)
-            goal.update_progress()   # Auto update
-            serializer = GoalDetailSerializer(goal)
-            return Response(serializer.data)
+            if not OrganizationMember.objects.filter(organization=goal.organization, user=request.user).exists():
+                return Response({"error": "Permission denied"}, status=403)
+            
+            goal.update_progress()
+            return Response(GoalDetailSerializer(goal).data)
         except Goal.DoesNotExist:
             return Response({"error": "Goal not found"}, status=404)
-
 
 class DeleteGoalView(APIView):
     permission_classes = [IsAuthenticated]
@@ -824,7 +852,6 @@ class DeleteGoalView(APIView):
     def delete(self, request, goal_id):
         try:
             goal = Goal.objects.get(id=goal_id)
-            # Only Owner or Admin can delete an Epic
             is_authorized = OrganizationMember.objects.filter(
                 organization=goal.organization, 
                 user=request.user, 
@@ -839,67 +866,6 @@ class DeleteGoalView(APIView):
         except Goal.DoesNotExist:
             return Response({"error": "Epic not found"}, status=404)
 
-
-# ==================== FULL TASK UPDATE ====================
-class UpdateTaskView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request, task_id):
-        try:
-            task = Task.objects.get(id=task_id)
-            
-            # Permission check: Owner, Admin, Manager, or Assignee
-            is_assignee = task.assignees.filter(id=request.user.id).exists()
-            is_privileged = OrganizationMember.objects.filter(
-                organization=task.organization, 
-                user=request.user, 
-                role__in=['owner', 'admin', 'manager']
-            ).exists()
-            
-            if not (is_assignee or is_privileged):
-                return Response({"error": "You do not have permission to edit this task details."}, status=403)
-
-            serializer = TaskUpdateSerializer(task, data=request.data, partial=True)
-            
-            if serializer.is_valid():
-                serializer.save()
-                task.goal.update_progress()   # Auto refresh goal progress
-                return Response({
-                    "message": "Task updated successfully!",
-                    "task": TaskSerializer(task).data
-                })
-            return Response(serializer.errors, status=400)
-        except Task.DoesNotExist:
-            return Response({"error": "Task not found"}, status=404)
-
-
-# ==================== DELETE TASK ====================
-class DeleteTaskView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def delete(self, request, task_id):
-        try:
-            task = Task.objects.get(id=task_id)
-            
-            # Permission check: Owner, Admin, or Manager can delete
-            is_authorized = OrganizationMember.objects.filter(
-                organization=task.organization, 
-                user=request.user, 
-                role__in=['owner', 'admin', 'manager']
-            ).exists()
-            if not is_authorized:
-                return Response({"error": "Only an Owner, Admin, or Manager can delete tasks."}, status=403)
-
-            goal = task.goal
-            task.delete()
-            if goal:
-                goal.update_progress()
-            return Response({"message": "Task deleted successfully!"}, status=204)
-        except Task.DoesNotExist:
-            return Response({"error": "Task not found"}, status=404)
-
-
-# ==================== FILTERED TASKS ====================
 class FilteredTasksView(APIView):
     permission_classes = [AllowAny]
 
@@ -907,7 +873,6 @@ class FilteredTasksView(APIView):
         try:
             queryset = Task.objects.filter(organization_id=org_id)
             
-            # Filters
             status = request.query_params.get('status')
             priority = request.query_params.get('priority')
             assignee = request.query_params.get('assignee')
@@ -927,8 +892,6 @@ class FilteredTasksView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)       
         
-        
-# ====================== ACTIVITY LOG ======================
 class ActivityLogView(APIView):
     permission_classes = [AllowAny]
 
@@ -940,8 +903,6 @@ class ActivityLogView(APIView):
             "logs": serializer.data
         })
 
-
-# ====================== TASK ATTACHMENTS ======================
 class TaskAttachmentUploadView(APIView):
     permission_classes = [AllowAny]
 
@@ -953,7 +914,6 @@ class TaskAttachmentUploadView(APIView):
             if not file:
                 return Response({"error": "No file uploaded"}, status=400)
 
-            # Fallback for testing if user not authenticated
             current_user = request.user if request.user.is_authenticated else User.objects.first()
 
             attachment = TaskAttachment.objects.create(
@@ -977,8 +937,6 @@ class TaskAttachmentUploadView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
-# ====================== SEARCH API ======================
 class GlobalSearchView(APIView):
     permission_classes = [AllowAny]
 
@@ -1004,8 +962,6 @@ class GlobalSearchView(APIView):
             "tasks": TaskSerializer(tasks, many=True).data
         })
 
-
-# ====================== BULK UPDATE ======================
 class BulkTaskUpdateView(APIView):
     permission_classes = [AllowAny]
 
@@ -1021,8 +977,6 @@ class BulkTaskUpdateView(APIView):
             "updated_count": updated_count
         })
 
-
-# ====================== REMOVE ASSIGNEE ======================
 class RemoveTaskAssigneeView(APIView):
     permission_classes = [AllowAny]
 
@@ -1035,8 +989,6 @@ class RemoveTaskAssigneeView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
-# ====================== SOFT DELETE ======================
 class SoftDeleteTaskView(APIView):
     permission_classes = [AllowAny]
 
@@ -1048,47 +1000,36 @@ class SoftDeleteTaskView(APIView):
         except Task.DoesNotExist:
             return Response({"error": "Task not found"}, status=404)         
 
-# ====================== PHASE 4: DASHBOARD ======================
 class DashboardStatsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, org_id):
         try:
-            from .models import Organization, Goal, Task, OrganizationMember
             org = Organization.objects.get(id=org_id)
             
-            # activeGoals: not completed
             active_goals = Goal.objects.filter(organization=org).exclude(status='completed').count()
             
-            # openTasks: not done
             open_tasks = Task.objects.filter(organization=org).exclude(status='done').count()
             
-            # completion: tasks done / total tasks
             total_tasks = Task.objects.filter(organization=org).count()
             done_tasks = Task.objects.filter(organization=org, status='done').count()
             completion = int((done_tasks / total_tasks * 100) if total_tasks > 0 else 0)
             
-            # teamMembers
             team_members = OrganizationMember.objects.filter(organization=org, is_active=True).count()
             
-            # recent activity
             activity_qs = ActivityLog.objects.filter(organization=org).order_by('-created_at')[:10]
             recent_activity = ActivityLogSerializer(activity_qs, many=True).data
             
-            # recent goals
             recent_goals_qs = Goal.objects.filter(organization=org).order_by('-created_at')[:5]
             recent_goals = [{"id": str(g.id), "title": g.title, "status": g.status, "progress": g.progress} for g in recent_goals_qs]
             
-            # my tasks -> Show all active tasks for the org as per new requirement
             user = request.user
             my_tasks = []
             
-            # Visibility check: Must be a member
             if not OrganizationMember.objects.filter(organization=org, user=request.user).exists():
                 return Response({"error": "Permission denied"}, status=403)
 
             if user.is_authenticated:
-                # Removed assignees=user filter so employees see all tasks
                 my_tasks_qs = Task.objects.filter(organization=org).exclude(status='done').order_by('due_date')[:5]
                 my_tasks = [{"id": str(t.id), "title": t.title, "status": t.status, "priority": t.priority} for t in my_tasks_qs]
             
@@ -1104,15 +1045,13 @@ class DashboardStatsView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
-
-# ====================== QUICK ASSIGN ======================
 class QuickAssignTaskView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         user_id = request.data.get('user_id')
         org_id = request.data.get('organization_id')
-        goal_id = request.data.get('goal_id') # Optional filter
+        goal_id = request.data.get('goal_id')
         task_id = request.data.get('task_id')
 
         if not user_id or not org_id:
@@ -1122,19 +1061,25 @@ class QuickAssignTaskView(APIView):
             user = User.objects.get(id=user_id)
             organization = Organization.objects.get(id=org_id)
             
-            # 1. Add to Organization if not member
+            is_authorized = OrganizationMember.objects.filter(
+                organization=organization, 
+                user=request.user, 
+                role__in=['owner', 'admin', 'manager']
+            ).exists()
+            
+            if not is_authorized:
+                return Response({"error": "Only Owners, Admins, or Managers can assign work or hire talent."}, status=403)
+
             member, created = OrganizationMember.objects.get_or_create(
                 organization=organization,
                 user=user,
                 defaults={'role': 'member'}
             )
 
-            # 2. Assign Task if provided
             if task_id:
                 task = Task.objects.get(id=task_id, organization=organization)
                 task.assignees.add(user)
                 
-                # Log Activity
                 log_activity(
                     request.user, organization, "Quick Assign", "Task", task.id,
                     f"Assigned {user.username} to task: {task.title}"
@@ -1152,4 +1097,24 @@ class QuickAssignTaskView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=400)
-
+
+
+class ChatRoomListView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, org_id):
+        rooms = ChatRoom.objects.filter(organization_id=org_id)
+        serializer = ChatRoomSerializer(rooms, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, org_id):
+        serializer = ChatRoomSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(organization_id=org_id)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+class MessageHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request, room_id):
+        messages = Message.objects.filter(chatroom_id=room_id).order_by('created_at')[:50]
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data)

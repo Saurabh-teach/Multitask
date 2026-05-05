@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import Sidebar from '../../components/layout/Sidebar';
+import { AuthContext } from '../../context/AuthContext';
 import { 
   Search, Bell, Clock, CheckCircle2, 
   TrendingUp, ArrowUpRight, Target, ListTodo, Users, Zap
@@ -21,20 +22,23 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { token } = React.useContext(AuthContext);
 
   useEffect(() => {
     fetchDashboardData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
   const fetchDashboardData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return navigate('/login');
+      const activeToken = token || localStorage.getItem('token');
+      if (!activeToken) {
+        setLoading(false);
+        return navigate('/login');
+      }
 
       // 1. Fetch User Profile for Role/Name
       const profileRes = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${activeToken}` }
       });
       
       const currentOrg = profileRes.data.organizations?.[0];

@@ -1,15 +1,21 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { AuthContext } from '../../context/AuthContext';
 import { 
   LayoutDashboard, ListTodo, Target, Users, 
-  Building2, LogOut, Settings, HelpCircle, ChevronRight
+  Building2, LogOut, Settings, HelpCircle, ChevronRight, MessageSquare
 } from 'lucide-react';
 
 const Sidebar = () => {
-  const [profile, setProfile] = React.useState({ name: 'Loading...', role: 'Member' });
+  const { token } = React.useContext(AuthContext);
+  const [profile, setProfile] = useState({
+    name: 'Loading...',
+    role: '',
+    avatar: ''
+  });
   
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchProfile = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -21,7 +27,7 @@ const Sidebar = () => {
           const fullName = `${currentOrg.first_name || ''} ${currentOrg.last_name || ''}`.trim();
           setProfile({
             name: fullName || currentOrg.username || 'Team Member',
-            role: currentOrg.role?.charAt(0).toUpperCase() + currentOrg.role?.slice(1) || 'Member'
+            role: currentOrg.role?.charAt(0).toUpperCase() + currentOrg.role?.slice(1) || ''
           });
         }
       } catch (err) {
@@ -29,16 +35,22 @@ const Sidebar = () => {
       }
     };
     fetchProfile();
-  }, []);
+  }, [token]);
 
   const navItems = [
     { to: '/dashboard', label: 'Your Work', icon: LayoutDashboard, category: 'Planning' },
     { to: '/goals', label: 'Epic Tracker', icon: Target },
     { to: '/tasks', label: 'Sprint Board', icon: ListTodo },
     { to: '/members', label: 'Workforce', icon: Users, category: 'Workspace' },
-    { to: '/talent-pool', label: 'Talent Pool', icon: Users },
-    { to: '/organizations', label: 'Organizations', icon: Building2 },
+    { to: '/chat/6f0ed70b-f82d-4f1c-8ac5-7d45970ebe71', label: 'Messenger', icon: MessageSquare, category: 'Communication' },
+    { to: '/talent-pool', label: 'Talent Pool', icon: Users, roles: ['Owner', 'Admin', 'Manager'] },
+    { to: '/organizations', label: 'Organizations', icon: Building2, roles: ['Owner', 'Admin'] },
   ];
+
+  const filteredItems = navItems.filter(item => {
+    if (!item.roles) return true;
+    return item.roles.includes(profile.role);
+  });
 
   return (
     <div className="w-72 h-screen bg-white text-gray-700 flex flex-col fixed left-0 top-0 border-r border-gray-200 shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-50 overflow-y-auto">
@@ -58,7 +70,7 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-4 space-y-1">
-        {navItems.map((item, idx) => (
+        {filteredItems.map((item, index) => (
           <React.Fragment key={item.to}>
             {item.category && (
               <div className="px-4 mt-6 mb-2">
@@ -86,9 +98,12 @@ const Sidebar = () => {
       {/* Footer Area */}
       <div className="p-6 bg-gray-50/50 mt-auto">
         <div className="space-y-1 mb-6">
-          <button className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-[13px] font-semibold text-gray-500 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all duration-300">
+          <NavLink 
+            to="/settings" 
+            className={({ isActive }) => `w-full flex items-center gap-3 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all duration-300 ${isActive ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-white hover:text-blue-600 hover:shadow-sm'}`}
+          >
             <Settings size={18} /> Settings
-          </button>
+          </NavLink>
           <button className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-[13px] font-semibold text-gray-500 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all duration-300">
             <HelpCircle size={18} /> Help Center
           </button>

@@ -4,7 +4,6 @@ from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 SECRET_KEY = 'your-secret-key-here-change-in-production'
 
 DEBUG = True
@@ -14,8 +13,8 @@ ALLOWED_HOSTS = []
 from dotenv import load_dotenv
 
 load_dotenv()   
-# ====================== INSTALLED APPS ======================
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -23,17 +22,32 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # Third Party
     'rest_framework',
     'corsheaders',
+    'channels',
 
-    # Our Apps
     'accounts',
 ]
 
-# ====================== MIDDLEWARE ======================
+ASGI_APPLICATION = 'backend.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
+# Celery Settings
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/1'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/1'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',   # Keep this at top
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -46,11 +60,10 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'backend.urls'
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-# ====================== TEMPLATES (FIXED) ======================
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],  # Optional custom templates folder
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -63,7 +76,6 @@ TEMPLATES = [
     },
 ]
 
-# ====================== DATABASE ======================
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -75,10 +87,8 @@ DATABASES = {
     }
 }
 
-# ====================== AUTH ======================
-AUTH_USER_MODEL = 'accounts.User'   # Custom User Model
+AUTH_USER_MODEL = 'accounts.User'
 
-# ====================== CORS (For React) ======================
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
@@ -88,26 +98,21 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3005",
 ]
 
-# ====================== REST FRAMEWORK ======================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
 }
 
-# ====================== JWT SETTINGS ======================
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
-# ====================== STATIC FILES ======================
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# ====================== MEDIA (Profile Pictures etc.) ======================
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# ====================== DEFAULT AUTO FIELD ======================
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
