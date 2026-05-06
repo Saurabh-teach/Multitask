@@ -15,10 +15,15 @@ from .views import (
     DashboardStatsView, GenerateInviteLinkView, JoinViaInviteView,
     AvailableTalentView, QuickAssignTaskView, UserProfileView,
     ChatRoomListView, MessageHistoryView,
+    SetupWorkspaceView, PersonalizeProfileView, InviteTeamView, JoinWorkspaceView
 )
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
+    path('setup-workspace/', SetupWorkspaceView.as_view(), name='setup-workspace'),
+    path('personalize-profile/', PersonalizeProfileView.as_view(), name='personalize-profile'),
+    path('invite-team/', InviteTeamView.as_view(), name='invite-team'),
+    path('join-workspace/<str:token>/', JoinWorkspaceView.as_view(), name='join-workspace'),
     path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
     path('login/', LoginView.as_view(), name='login'),
     path('profile/', UserProfileView.as_view(), name='profile'),

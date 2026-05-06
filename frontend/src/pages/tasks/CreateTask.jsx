@@ -28,24 +28,31 @@ const CreateTask = () => {
     status: 'todo'
   });
 
+  const [currentOrgId, setCurrentOrgId] = useState(localStorage.getItem('orgId') || null);
+
   useEffect(() => {
     fetchData();
-  }, []);
+    
+    // Refresh if org changes
+    const handleOrgChange = () => {
+        const newOrgId = localStorage.getItem('orgId');
+        setCurrentOrgId(newOrgId);
+    };
+    window.addEventListener('storage', handleOrgChange);
+    return () => window.removeEventListener('storage', handleOrgChange);
+  }, [currentOrgId]);
 
   const fetchData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const orgRes = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const orgId = orgRes.data.organizations?.[0]?.organization_id || orgRes.data.organizations?.[0]?.id;
+      const activeOrgId = currentOrgId || localStorage.getItem('orgId');
       
-      if (orgId) {
+      if (activeOrgId) {
         const [memRes, goalRes] = await Promise.all([
-          axios.get(`http://127.0.0.1:8000/api/auth/organizations/${orgId}/members/`, {
+          axios.get(`http://127.0.0.1:8000/api/auth/organizations/${activeOrgId}/members/`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          axios.get(`http://127.0.0.1:8000/api/auth/organizations/${orgId}/goals/`, {
+          axios.get(`http://127.0.0.1:8000/api/auth/organizations/${activeOrgId}/goals/`, {
             headers: { Authorization: `Bearer ${token}` }
           })
         ]);
@@ -103,7 +110,7 @@ const CreateTask = () => {
               <h1 className="text-2xl font-bold text-gray-900 brand-font tracking-tight">Create New Issue</h1>
             </div>
             <div className="flex items-center gap-2 text-indigo-600 text-xs font-bold uppercase tracking-widest">
-               <Layers size={16} /> Sprint Execution
+               <Layers size={16} /> Goal Execution
             </div>
           </div>
         </nav>
@@ -125,7 +132,7 @@ const CreateTask = () => {
                    <form onSubmit={handleSubmit} className="space-y-8">
                       <div className="space-y-2">
                         <label className="text-[12px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                           <Layers size={14} /> Parent Strategic Epic <span className="text-red-500">*</span>
+                           <Layers size={14} /> Parent Strategic Goal <span className="text-red-500">*</span>
                         </label>
                         <select 
                           required
@@ -133,7 +140,7 @@ const CreateTask = () => {
                           value={formData.goal}
                           onChange={(e) => setFormData({...formData, goal: e.target.value})}
                         >
-                          <option value="">Select an epic...</option>
+                          <option value="">Select a goal...</option>
                           {goals.map(g => (
                             <option key={g.id} value={g.id}>{g.title}</option>
                           ))}
@@ -142,7 +149,7 @@ const CreateTask = () => {
 
                       <div className="space-y-2">
                         <label className="text-[12px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                           <ShieldCheck size={14} /> Issue Type <span className="text-red-500">*</span>
+                           <ShieldCheck size={14} /> Task Type <span className="text-red-500">*</span>
                         </label>
                         <div className="grid grid-cols-3 gap-4">
                            {['task', 'story', 'bug'].map(type => (
@@ -160,7 +167,7 @@ const CreateTask = () => {
 
                       <div className="space-y-2">
                         <label className="text-[12px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                           <ListTodo size={14} /> Issue Title <span className="text-red-500">*</span>
+                           <ListTodo size={14} /> Task Title <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -238,7 +245,7 @@ const CreateTask = () => {
                            disabled={loading}
                            className="btn-primary w-full py-5 text-xl shadow-xl shadow-blue-500/20"
                          >
-                           {loading ? "Creating Issue..." : "Create Issue"}
+                           {loading ? "Creating Task..." : "Create Task"}
                            {!loading && <Plus size={24} />}
                          </button>
                       </div>

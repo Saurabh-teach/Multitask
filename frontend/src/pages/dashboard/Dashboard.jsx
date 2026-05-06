@@ -24,41 +24,53 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { token } = React.useContext(AuthContext);
 
+  const [currentOrgId, setCurrentOrgId] = useState(localStorage.getItem('orgId') || null);
+
   useEffect(() => {
     fetchDashboardData();
-  }, [token]);
+    
+    // Listen for organization changes in the sidebar
+    const handleOrgChange = () => {
+        const newOrgId = localStorage.getItem('orgId');
+        setCurrentOrgId(newOrgId);
+        setLoading(true);
+    };
+    window.addEventListener('storage', handleOrgChange);
+    return () => window.removeEventListener('storage', handleOrgChange);
+  }, [token, currentOrgId]);
 
   const fetchDashboardData = async () => {
     try {
       const activeToken = token || localStorage.getItem('token');
+      const activeOrgId = currentOrgId || localStorage.getItem('orgId');
+
       if (!activeToken) {
         setLoading(false);
         return navigate('/login');
       }
 
-      // 1. Fetch User Profile for Role/Name
+      // 1. Fetch User Profile & Orgs for context
       const profileRes = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
         headers: { Authorization: `Bearer ${activeToken}` }
       });
       
-      const currentOrg = profileRes.data.organizations?.[0];
-      const orgId = currentOrg?.id || currentOrg?.organization_id;
+      const orgsList = profileRes.data.organizations || [];
+      const currentOrg = orgsList.find(o => (o.id || o.organization_id) === activeOrgId) || orgsList[0];
       
-      // Determine user details from first org membership
       if (currentOrg) {
          setUser({
             name: `${currentOrg.first_name} ${currentOrg.last_name}`.trim() || 'Team Member',
             role: currentOrg.role || 'member',
             job_title: currentOrg.job_title || 'Expert'
          });
-      }
-
-      if (orgId) {
-        const res = await axios.get(
-          `http://127.0.0.1:8000/api/auth/organizations/${orgId}/dashboard/`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setStats({ ...res.data, role: currentOrg.role });
+         
+         const finalOrgId = currentOrg.id || currentOrg.organization_id;
+         
+         const res = await axios.get(
+           `http://127.0.0.1:8000/api/auth/organizations/${finalOrgId}/dashboard/`,
+           { headers: { Authorization: `Bearer ${activeToken}` } }
+         );
+         setStats({ ...res.data, role: currentOrg.role });
       }
     } catch (err) {
       console.error('Error fetching dashboard:', err);
@@ -125,13 +137,13 @@ const Dashboard = () => {
                     <Target size={64} className="text-blue-600" />
                   </div>
                   <p className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    {stats.role === 'owner' ? 'Active Epics' : 'My Active Work'}
+                    {stats.role === 'owner' ? 'Active Goals' : 'My Active Work'}
                   </p>
                   <div className="flex items-end gap-3">
                     <h3 className="text-4xl font-bold text-gray-900 brand-font">
                         {stats.role === 'owner' ? stats.activeGoals : stats.myTasks.filter(t => t.status !== 'done').length}
                     </h3>
-                    <span className="text-blue-600 font-bold text-sm mb-1 flex items-center"><Zap size={14} className="fill-blue-600" /> {stats.role === 'owner' ? 'Strategic' : 'Personal'}</span>
+                    <span className="text-blue-600 font-bold text-sm mb-1 flex items-center"><Zap size={14} className="fill-blue-600" /> {stats.role === 'owner' ? 'Impactful' : 'Personal'}</span>
                   </div>
                 </div>
 
@@ -179,7 +191,7 @@ const Dashboard = () => {
                         <h2 className="text-xl font-bold text-gray-900 brand-font">Your Assignments</h2>
                         <p className="text-xs text-gray-500 font-medium mt-1">Tasks specifically assigned to your account</p>
                       </div>
-                      <button onClick={() => navigate('/tasks')} className="px-4 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-all">View Sprint Board</button>
+                      <button onClick={() => navigate('/tasks')} className="px-4 py-2 text-sm font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-all">View All Tasks</button>
                     </div>
                     
                     <div className="divide-y divide-gray-50">
@@ -226,7 +238,7 @@ const Dashboard = () => {
                   {/* Recent Epics */}
                   <div className="card-premium">
                     <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-lg font-bold text-gray-900 brand-font">Strategic Epics</h3>
+                      <h3 className="text-lg font-bold text-gray-900 brand-font">Strategic Goals</h3>
                       <button onClick={() => navigate('/goals')} className="text-blue-600 p-2 hover:bg-blue-50 rounded-xl transition-all">
                         <ArrowUpRight size={20} />
                       </button>
@@ -248,7 +260,7 @@ const Dashboard = () => {
                         </div>
                       )) : (
                         <div className="text-center py-10">
-                          <p className="text-sm text-gray-400 font-medium">No strategic epics active.</p>
+                          <p className="text-sm text-gray-400 font-medium">No strategic goals active.</p>
                         </div>
                       )}
                     </div>

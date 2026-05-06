@@ -10,10 +10,8 @@ const Register = () => {
     username: '',
     first_name: '',
     last_name: '',
-    phone: '',
     email: '',
     password: '',
-    role_choice: 'owner'
   });
   const [loading, setLoading] = useState(false);
 
@@ -21,11 +19,36 @@ const Register = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post('http://127.0.0.1:8000/api/auth/register/', formData);
-      toast.success("Registration successful! Verify your phone.");
-      navigate('/verify-otp', { state: { phone: formData.phone } });
+      const res = await axios.post('http://127.0.0.1:8000/api/auth/register/', formData);
+      
+      // Step 1 Complete
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+
+      // Check for pending invite (from clicking an invite link)
+      const pendingInvite = localStorage.getItem('pendingInvite');
+      if (pendingInvite) {
+        toast.success("Account created! Finalizing team access...");
+        navigate(`/join/${pendingInvite}`);
+        return;
+      }
+
+      toast.success("Account created! Let's set up your workspace.");
+      navigate('/setup-workspace');
     } catch (err) {
-      toast.error(err.response?.data?.error || "Registration failed. Try again.");
+      const data = err.response?.data;
+      let errorMsg = "Registration failed. Try again.";
+      
+      if (data) {
+        if (typeof data === 'string') errorMsg = data;
+        else if (data.error) errorMsg = data.error;
+        else if (typeof data === 'object') {
+           errorMsg = Object.entries(data)
+             .map(([key, val]) => `${key}: ${Array.isArray(val) ? val[0] : val}`)
+             .join(' | ');
+        }
+      }
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -47,8 +70,8 @@ const Register = () => {
             <span className="text-2xl font-bold text-gray-900 brand-font">GoalFlow</span>
           </div>
 
-          <h2 className="text-3xl font-bold text-gray-900 mb-2 brand-font">Create your account</h2>
-          <p className="text-gray-500 mb-8 font-medium">Join 2,000+ teams executing with clarity.</p>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2 brand-font">Get started for free</h2>
+          <p className="text-gray-500 mb-8 font-medium">Step 1: Create your professional profile.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -89,18 +112,6 @@ const Register = () => {
             </div>
 
             <div className="relative">
-              <Phone className="absolute left-4 top-3.5 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Phone Number (e.g. 9876543210)"
-                className="input-premium pl-12"
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                required
-              />
-            </div>
-
-            <div className="relative">
               <Mail className="absolute left-4 top-3.5 text-gray-400" size={18} />
               <input
                 type="email"
@@ -124,24 +135,12 @@ const Register = () => {
               />
             </div>
 
-            <div className="relative">
-              <Building className="absolute left-4 top-3.5 text-gray-400" size={18} />
-              <select
-                className="input-premium pl-12 appearance-none"
-                value={formData.role_choice}
-                onChange={(e) => setFormData({...formData, role_choice: e.target.value})}
-              >
-                <option value="owner">Organization Owner</option>
-                <option value="member">Team Member</option>
-              </select>
-            </div>
-
             <button
               type="submit"
               disabled={loading}
               className="btn-primary w-full py-4 text-lg mt-4"
             >
-              {loading ? "Creating account..." : "Sign Up for Free"}
+              {loading ? "Creating profile..." : "Continue to Workspace"}
               {!loading && <ArrowRight size={20} />}
             </button>
           </form>

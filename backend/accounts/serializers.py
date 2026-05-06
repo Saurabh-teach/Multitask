@@ -13,8 +13,9 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-    password2 = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-    role_choice = serializers.ChoiceField(choices=['owner', 'member'], required=True)
+    password2 = serializers.CharField(write_only=True, required=False, style={'input_type': 'password'})
+    role_choice = serializers.ChoiceField(choices=['owner', 'member'], required=False, default='owner')
+    phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = User
@@ -22,24 +23,32 @@ class RegisterSerializer(serializers.ModelSerializer):
                   'password', 'password2', 'role_choice']
 
     def validate(self, attrs):
-        if attrs['password'] != attrs['password2']:
+        # Make password2 optional if the frontend only provides one password field
+        p2 = attrs.get('password2')
+        if p2 and attrs['password'] != p2:
             raise serializers.ValidationError({"password": "Passwords do not match."})
         
         if User.objects.filter(username=attrs['username']).exists():
             raise serializers.ValidationError({"username": "This username is already taken."})
+            
+        if User.objects.filter(email=attrs['email']).exists():
+            raise serializers.ValidationError({"email": "A user with this email already exists."})
         
         return attrs
 
     def create(self, validated_data):
-        validated_data.pop('password2')
-        role_choice = validated_data.pop('role_choice')
-        
+        validated_data.pop('password2', None)
+        role_choice = validated_data.pop('role_choice', 'owner')
+        phone = validated_data.get('phone')
+        if phone == "":
+            phone = None
+
         user = User.objects.create_user(
             username=validated_data['username'],
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             email=validated_data.get('email'),
-            phone=validated_data.get('phone'),
+            phone=phone,
             password=validated_data['password']
         )
         return user
@@ -110,13 +119,19 @@ class TaskSerializer(serializers.ModelSerializer):
     )
     assignee_details = serializers.SerializerMethodField()
     completion_date = serializers.SerializerMethodField()
+    goal_details = serializers.SerializerMethodField()
     
     class Meta:
         model = Task
-        fields = ['id', 'goal', 'issue_type', 'title', 'description', 'assignees',
+        fields = ['id', 'goal', 'goal_details', 'issue_type', 'title', 'description', 'assignees',
                   'assignee_details', 'status', 'priority', 'due_date', 'estimated_hours',
                   'created_at', 'updated_at', 'completion_date']
         read_only_fields = ['created_at', 'updated_at']
+
+    def get_goal_details(self, obj):
+        if obj.goal:
+            return {"id": str(obj.goal.id), "title": obj.goal.title}
+        return None
 
     def get_assignee_details(self, obj):
         return [{"id": str(user.id), "name": user.get_full_name() or user.username, "initial": (user.username[0] if user.username else 'U').upper()} 

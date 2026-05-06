@@ -7,7 +7,7 @@ class User(AbstractUser):
     """Main User Table"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
-    phone = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    phone = models.CharField(max_length=15, null=True, blank=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     
     city = models.CharField(max_length=100, blank=True, null=True)
@@ -16,6 +16,9 @@ class User(AbstractUser):
     department = models.CharField(max_length=100, blank=True, null=True)
     profile_picture = models.ImageField(upload_to='profiles/', blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
+    
+    # Track progressive setup state
+    setup_step = models.IntegerField(default=1) # 1: Account, 2: Workspace, 3: Personalize, 4: Invite, 5: Complete
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -41,6 +44,25 @@ class Organization(models.Model):
     def __str__(self):
         return self.name
 
+class Invitation(models.Model):
+    STATUS_CHOICES = [('pending', 'Pending'), ('accepted', 'Accepted'), ('expired', 'Expired')]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField()
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='invites')
+    invited_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_invites')
+    token = models.CharField(max_length=100, unique=True)
+    role = models.CharField(max_length=20, default='member')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def __str__(self):
+        return f"Invite to {self.email} for {self.organization.name}"
+
 class OrganizationMember(models.Model):
     ROLE_CHOICES = [
         ('owner', 'Owner'), ('admin', 'Admin'), ('manager', 'Manager'),
@@ -61,10 +83,7 @@ class OrganizationMember(models.Model):
         ordering = ['-joined_at']
 
     def save(self, *args, **kwargs):
-        if not self.pk:
-            if OrganizationMember.objects.filter(user=self.user).exists():
-                from django.core.exceptions import ValidationError
-                raise ValidationError(f"User {self.user.username} is already employed at another organization.")
+        # Removed restriction: Users can now belong to multiple organizations
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -154,6 +154,22 @@ const ResourceManagement = () => {
     }
   };
 
+  const getRoleBadge = (role) => {
+    const roles = {
+      owner: { color: 'bg-purple-50 text-purple-700 border-purple-100', icon: <Shield size={12} /> },
+      admin: { color: 'bg-red-50 text-red-700 border-red-100', icon: <Shield size={12} /> },
+      manager: { color: 'bg-blue-50 text-blue-700 border-blue-100', icon: <Activity size={12} /> },
+      member: { color: 'bg-slate-50 text-slate-700 border-slate-200', icon: <Users size={12} /> },
+    };
+    const style = roles[role?.toLowerCase()] || roles.member;
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border ${style.color}`}>
+        {style.icon}
+        {role}
+      </span>
+    );
+  };
+
   const filteredTeam = members.filter(m => 
     (m.full_name || m.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (m.job_title || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -240,7 +256,10 @@ const ResourceManagement = () => {
                                 {person.username?.[0]?.toUpperCase()}
                              </div>
                              <div>
-                                <p className="font-bold text-gray-900 text-[15px]">{person.full_name || person.username}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-bold text-gray-900 text-[15px]">{person.full_name || person.username}</p>
+                                  {getRoleBadge(person.role)}
+                                </div>
                                 <p className="text-[11px] text-gray-400 font-medium">{person.email}</p>
                              </div>
                           </div>

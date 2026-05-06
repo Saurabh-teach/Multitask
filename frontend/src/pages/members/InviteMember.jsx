@@ -47,9 +47,33 @@ const InviteMember = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    // ... existing email invite logic ...
-    toast.success("Invitation email queued!");
-    setLoading(false);
+    try {
+      const token = localStorage.getItem('token');
+      const orgRes = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const orgId = orgRes.data.organizations?.[0]?.organization_id;
+
+      await axios.post('http://127.0.0.1:8000/api/auth/invite-team/', {
+        emails: [formData.email],
+        organization_id: orgId
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      toast.success("Invitation sent! Check terminal for link.");
+      setFormData({...formData, email: ''});
+    } catch (err) {
+      if (err.response?.status === 401) {
+        toast.error("Session expired. Please log in again.");
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        toast.error("Failed to send invitation");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

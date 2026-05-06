@@ -12,7 +12,7 @@ from twilio.rest import Client
 from django.shortcuts import get_object_or_404
 import uuid
 
-from .models import User, Organization, OrganizationMember, OTPVerification, JoinRequest, Task, Goal, TaskComment, InviteCode, OrganizationMember, TaskAttachment, ActivityLog, ChatRoom, Message, ChatRoomMember
+from .models import User, Organization, OrganizationMember, OTPVerification, JoinRequest, Task, Goal, TaskComment, InviteCode, OrganizationMember, TaskAttachment, ActivityLog, ChatRoom, Message, ChatRoomMember, Invitation
 from .serializers import (
     RegisterSerializer, 
     UserSerializer, 
@@ -107,24 +107,167 @@ class UserProfileView(APIView):
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            otp = generate_otp()
-            expires_at = timezone.now() + timezone.timedelta(minutes=10)
+            user.setup_step = 2 # Advance to Workspace Setup
+            user.save()
 
-            OTPVerification.objects.create(
-                phone=user.phone, otp=otp, expires_at=expires_at, purpose='register'
-            )
-            send_otp_via_twilio(user.phone, otp)
+            from rest_framework_simplejwt.tokens import RefreshToken
+            refresh = RefreshToken.for_user(user)
 
             return Response({
-                "message": "Registration successful. OTP sent.",
-                "phone": user.phone
+                "message": "Account created successfully.",
+                "user": UserSerializer(user).data,
+                "token": str(refresh.access_token),
+                "refresh": str(refresh),
+                "setup_step": user.setup_step
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class SetupWorkspaceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        name = request.data.get('name')
+        if not name:
+            return Response({"error": "Workspace name is required"}, status=400)
+
+        # 1. Create Organization
+        org = Organization.objects.create(
+            name=name,
+            created_by=request.user
+        )
+        
+        # 2. Make creator the OWNER
+        OrganizationMember.objects.create(
+            organization=org,
+            user=request.user,
+            role='owner'
+        )
+
+        # 3. Advance Step
+        request.user.setup_step = 3
+        request.user.save()
+
+        return Response({
+            "message": "Workspace created successfully",
+            "organization_id": org.id,
+            "setup_step": request.user.setup_step
+        })
+
+class PersonalizeProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        job_title = request.data.get('job_title')
+        if not job_title:
+            return Response({"error": "Job title is required"}, status=400)
+
+        request.user.job_title = job_title
+        request.user.setup_step = 4
+        request.user.save()
+
+        return Response({
+            "message": "Profile personalized",
+            "setup_step": request.user.setup_step
+        })
+
+class InviteTeamView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        emails = request.data.get('emails', [])
+        org_id = request.data.get('organization_id')
+        
+        if not org_id:
+            return Response({"error": "Organization ID is required"}, status=400)
+            
+        org = get_object_or_404(Organization, id=org_id)
+        
+        from django.utils.crypto import get_random_string
+        from datetime import timedelta
+
+        import uuid
+        invitation_objects = []
+        for email in emails:
+            token = str(uuid.uuid4())
+            invite = Invitation.objects.create(
+                email=email,
+                organization=org,
+                invited_by=request.user,
+                token=token,
+                expires_at=timezone.now() + timedelta(days=7)
+            )
+            # LOG FOR DEV: Print the invite link to terminal
+            print("\n" + "="*50)
+            print(f"NEW INVITATION GENERATED")
+            print(f"TO: {email}")
+            print(f"LINK: http://localhost:3000/join/{token}")
+            print("="*50 + "\n")
+            invitation_objects.append({"email": email, "token": token})
+
+        request.user.setup_step = 5 # Complete
+        request.user.save()
+
+        return Response({
+            "message": f"Sent {len(invitation_objects)} invitations",
+            "setup_step": request.user.setup_step,
+            "tokens": invitation_objects
+        })
+
+class JoinWorkspaceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, token):
+        # DEV LOG
+        print(f"\n[JOIN ATTEMPT] Received Token: {token}")
+
+        # Check if it was already accepted (Case-insensitive)
+        already_accepted = Invitation.objects.filter(token__iexact=token, status='accepted').first()
+        if already_accepted:
+             print(f"[JOIN] Already accepted for {already_accepted.organization.name}")
+             return Response({
+                "message": f"You are already a member of {already_accepted.organization.name}",
+                "organization_id": already_accepted.organization.id
+            })
+
+        # Find the invitation (Case-insensitive)
+        try:
+            invitation = Invitation.objects.get(token__iexact=token, status='pending')
+            print(f"[JOIN] Found pending invite for {invitation.email}")
+        except Invitation.DoesNotExist:
+            print(f"[JOIN] ERROR: Token {token} not found in database!")
+            return Response({"error": "Invalid or expired invitation link."}, status=404)
+        
+        if invitation.is_expired():
+            print(f"[JOIN] ERROR: Token {token} is expired!")
+            return Response({"error": "Invitation link has expired"}, status=400)
+            
+        # 1. Join Organization
+        OrganizationMember.objects.get_or_create(
+            organization=invitation.organization,
+            user=request.user,
+            defaults={'role': invitation.role}
+        )
+        
+        # 2. Mark invite as accepted
+        invitation.status = 'accepted'
+        invitation.save()
+        
+        # 3. Mark user setup as complete since they joined an existing org
+        request.user.setup_step = 5
+        request.user.save()
+
+        return Response({
+            "message": f"Successfully joined {invitation.organization.name}",
+            "organization_id": invitation.organization.id
+        })
 
 class VerifyOTPView(APIView):
     permission_classes = [AllowAny]
@@ -250,55 +393,17 @@ class LoginView(APIView):
                 return Response({"error": "No account found with this username/email"}, status=404)
 
             if user.check_password(password):
-                DUMMY_TEST_ACCOUNTS = [
-                    'rahul@goalflow.com', 'priya@goalflow.com', 'amit@goalflow.com',
-                    'neha@goalflow.com', 'vikram@goalflow.com', 'sneha@goalflow.com',
-                    'saurabhangale9332@gmail.com', 'Saurabh101', 'rahul_dev'
-                ]
+                from rest_framework_simplejwt.tokens import RefreshToken
+                refresh = RefreshToken.for_user(user)
                 
-                # Allow test accounts to pass for developer testing
-                is_test_account = user.email in DUMMY_TEST_ACCOUNTS or user.username in DUMMY_TEST_ACCOUNTS or user.phone == '+919999999999'
-                
-                if is_test_account:
-                    from rest_framework_simplejwt.tokens import RefreshToken
-                    refresh = RefreshToken.for_user(user)
-                    return Response({
-                        "message": "Direct login successful!",
-                        "user": UserSerializer(user).data,
-                        "token": str(refresh.access_token),
-                        "refresh": str(refresh),
-                        "step": "dashboard"
-                    }, status=200)
-
-                otp = generate_otp()
-                expires_at = timezone.now() + timezone.timedelta(minutes=10)
-                identifier = user.phone or user.email
-                
-                phone_bare = identifier.replace('+91', '')
-                OTPVerification.objects.filter(
-                    phone__in=[identifier, phone_bare, f'+91{phone_bare}'],
-                    purpose='login'
-                ).delete()
-                
-                OTPVerification.objects.create(phone=identifier, otp=otp, expires_at=expires_at, purpose='login')
-                print(f"\n{'='*50}")
-                print(f"[Login] NEW OTP for {identifier}: {otp}")
-                print(f"{'='*50}\n")
-                
-                if user.phone:
-                    send_otp_via_twilio(user.phone, otp)
-                
-                dev_otp = otp
-
-                response_data = {
-                    "message": "Password correct! OTP sent to your phone.",
-                    "phone": user.phone or user.email,
-                    "step": "otp",
-                    "dev_otp": dev_otp,
-                    "dev_note": "Check your SMS. OTP also shown here as backup."
-                }
-
-                return Response(response_data)
+                # BYPASS OTP FOR TESTING: Directly return tokens
+                return Response({
+                    "message": "Login successful (Bypassed OTP for testing).",
+                    "user": UserSerializer(user).data,
+                    "token": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "step": "dashboard"
+                }, status=200)
             return Response({"error": "Incorrect password. Please try again."}, status=401)
         except Exception as e:
             import traceback
@@ -345,10 +450,6 @@ class MyOrganizationsView(APIView):
             user=request.user, is_active=True
         ).select_related('organization')
         
-        owner_orgs = memberships.filter(role='owner')
-        if owner_orgs.exists():
-            memberships = owner_orgs
-
         data = []
         for m in memberships:
             total = OrganizationMember.objects.filter(organization=m.organization, is_active=True).count()
@@ -405,21 +506,18 @@ class OrganizationMembersView(APIView):
                 ).exclude(status='done').values_list('title', flat=True)[:3])
 
                 member_data.append({
-                    "member_id": str(member.id),
+                    "id": str(member.id),
                     "user_id": str(member.user.id),
                     "username": member.user.username,
                     "full_name": member.user.get_full_name() or member.user.username,
                     "email": member.user.email,
                     "phone": member.user.phone,
-                    "job_title": member.user.job_title,
-                    "department": member.user.department,
                     "role": member.role,
-                    "joined_at": member.joined_at.strftime("%Y-%m-%d"),
-                    "is_active": member.is_active,
-                    "tasks_assigned": assigned_tasks,
-                    "tasks_completed": completed_tasks,
-                    "completion_rate": f"{completion_rate}%",
-                    "active_tasks": active_task_titles
+                    "assigned_tasks": assigned_tasks,
+                    "completed_tasks": completed_tasks,
+                    "completion_rate": completion_rate,
+                    "active_tasks": active_task_titles,
+                    "is_active": member.is_active
                 })
 
             return Response({
@@ -536,15 +634,30 @@ class GenerateInviteLinkView(APIView):
     def post(self, request, org_id):
         try:
             org = Organization.objects.get(id=org_id)
-            code = uuid.uuid4().hex[:10].upper()
-            invite = InviteCode.objects.create(
+            import uuid
+            token = str(uuid.uuid4())
+            role = request.data.get('role', 'member')
+            email = request.data.get('email', 'unspecified@test.com')
+            
+            invite = Invitation.objects.create(
+                email=email,
                 organization=org,
-                created_by=request.user,
-                code=code,
-                role=request.data.get('role', 'member')
+                invited_by=request.user,
+                token=token,
+                role=role,
+                expires_at=timezone.now() + timedelta(days=7)
             )
-            link = f"http://localhost:3002/join/{code}"
-            return Response({"invite_link": link, "code": code})
+            
+            link = f"http://localhost:3000/join/{token}"
+            
+            # DEV LOG
+            print("\n" + "="*50)
+            print(f"NEW SHARE LINK GENERATED")
+            print(f"ROLE: {role}")
+            print(f"LINK: {link}")
+            print("="*50 + "\n")
+            
+            return Response({"invite_link": link, "token": token})
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 

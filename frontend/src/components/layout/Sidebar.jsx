@@ -14,36 +14,66 @@ const Sidebar = () => {
     role: '',
     avatar: ''
   });
-  
+  const [goals, setGoals] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
+  const [currentOrgId, setCurrentOrgId] = useState(localStorage.getItem('orgId') || null);
+
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const currentOrg = res.data.organizations?.[0];
-        if (currentOrg) {
-          const fullName = `${currentOrg.first_name || ''} ${currentOrg.last_name || ''}`.trim();
-          setProfile({
-            name: fullName || currentOrg.username || 'Team Member',
-            role: currentOrg.role?.charAt(0).toUpperCase() + currentOrg.role?.slice(1) || ''
-          });
-        }
-      } catch (err) {
-        console.error(err);
+    fetchInitialData();
+  }, [token, currentOrgId]);
+
+  const fetchInitialData = async () => {
+    try {
+      const activeToken = token || localStorage.getItem('token');
+      const res = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
+        headers: { Authorization: `Bearer ${activeToken}` }
+      });
+      
+      const orgs = res.data.organizations || [];
+      setOrganizations(orgs);
+
+      // If no org selected yet, pick the first one
+      let selectedOrg = orgs.find(o => o.id === currentOrgId || o.organization_id === currentOrgId);
+      if (!selectedOrg && orgs.length > 0) {
+          selectedOrg = orgs[0];
+          const newId = selectedOrg.organization_id || selectedOrg.id;
+          setCurrentOrgId(newId);
+          localStorage.setItem('orgId', newId);
       }
-    };
-    fetchProfile();
-  }, [token]);
+
+      if (selectedOrg) {
+        const targetId = selectedOrg.organization_id || selectedOrg.id;
+        const fullName = `${selectedOrg.first_name || ''} ${selectedOrg.last_name || ''}`.trim();
+        setProfile({
+          name: fullName || selectedOrg.username || 'Team Member',
+          role: selectedOrg.role?.charAt(0).toUpperCase() + selectedOrg.role?.slice(1) || ''
+        });
+
+        // Fetch Goals for the selected organization
+        const goalsRes = await axios.get(`http://127.0.0.1:8000/api/auth/organizations/${targetId}/goals/`, {
+          headers: { Authorization: `Bearer ${activeToken}` }
+        });
+        setGoals(goalsRes.data);
+      }
+    } catch (err) {
+      console.error('Sidebar error:', err);
+    }
+  };
+
+  const handleOrgChange = (id) => {
+      setCurrentOrgId(id);
+      localStorage.setItem('orgId', id);
+      // Trigger a page refresh or event to update other components
+      window.dispatchEvent(new Event('storage')); 
+  };
 
   const navItems = [
     { to: '/dashboard', label: 'Your Work', icon: LayoutDashboard, category: 'Planning' },
-    { to: '/goals', label: 'Epic Tracker', icon: Target },
+    { to: '/goals', label: 'All Goals', icon: Target },
     { to: '/tasks', label: 'Sprint Board', icon: ListTodo },
-    { to: '/members', label: 'Workforce', icon: Users, category: 'Workspace' },
-    { to: '/chat/6f0ed70b-f82d-4f1c-8ac5-7d45970ebe71', label: 'Messenger', icon: MessageSquare, category: 'Communication' },
-    { to: '/talent-pool', label: 'Talent Pool', icon: Users, roles: ['Owner', 'Admin', 'Manager'] },
+    { to: '/members', label: 'Our Team', icon: Users, category: 'Workspace' },
+    { to: `/chat/${currentOrgId}`, label: 'Messenger', icon: MessageSquare, category: 'Communication' },
+    { to: '/talent-pool', label: 'Member Pool', icon: Users, roles: ['Owner', 'Admin', 'Manager'] },
     { to: '/organizations', label: 'Organizations', icon: Building2, roles: ['Owner', 'Admin'] },
   ];
 
@@ -53,10 +83,10 @@ const Sidebar = () => {
   });
 
   return (
-    <div className="w-72 h-screen bg-white text-gray-700 flex flex-col fixed left-0 top-0 border-r border-gray-200 shadow-[2px_0_15px_rgba(0,0,0,0.02)] z-50 overflow-y-auto">
+    <div className="w-72 h-screen bg-white text-gray-700 flex flex-col fixed left-0 top-0 border-r border-gray-200 shadow-[2px_0_15_rgba(0,0,0,0.02)] z-50 overflow-y-auto">
       
       {/* Logo Header */}
-      <div className="px-8 py-8">
+      <div className="px-8 py-8 flex flex-col gap-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/20">
             G
@@ -65,6 +95,27 @@ const Sidebar = () => {
             <div className="text-xl font-bold tracking-tight text-gray-900 brand-font">GoalFlow</div>
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Execute Together</p>
           </div>
+        </div>
+
+        {/* Organization Switcher */}
+        <div className="space-y-2">
+           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Active Workspace</label>
+           <div className="relative group">
+              <select 
+                value={currentOrgId || ''}
+                onChange={(e) => handleOrgChange(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[13px] font-bold text-gray-700 appearance-none focus:ring-2 focus:ring-blue-500/10 outline-none cursor-pointer transition-all pr-10"
+              >
+                {organizations.map(org => (
+                  <option key={org.id || org.organization_id} value={org.id || org.organization_id}>
+                    {org.organization_name || org.name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                 <ChevronRight size={16} className="rotate-90" />
+              </div>
+           </div>
         </div>
       </div>
 

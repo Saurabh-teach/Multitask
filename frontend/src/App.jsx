@@ -21,6 +21,10 @@ import GoalDetail from './pages/goals/GoalDetail';
 import CreateTask from './pages/tasks/CreateTask';
 import TaskDetail from './pages/tasks/TaskDetail';
 import Settings from './pages/settings/Settings';
+import SetupWorkspace from './pages/SetupWorkspace';
+import Personalize from './pages/Personalize';
+import InviteTeam from './pages/InviteTeam';
+import JoinWorkspace from './pages/JoinWorkspace';
 
 
 function App() {
@@ -32,6 +36,10 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/verify-otp" element={<VerifyOTP />} />
+          <Route path="/setup-workspace" element={<SetupWorkspace />} />
+          <Route path="/personalize" element={<Personalize />} />
+          <Route path="/invite-team" element={<InviteTeam />} />
+          <Route path="/join/:token" element={<JoinWorkspace />} />
 
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/goals" element={<Goals />} />

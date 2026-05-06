@@ -80,3 +80,14 @@ h1, h2, h3, h4, .brand-font {
 ::-webkit-scrollbar-thumb {
   @apply bg-gray-200 rounded-full hover:bg-gray-300 transition-colors;
 }
+
+/* Responsive Layout */
+@media (max-width: 1023px) {
+  .lg\:ml-72 {
+    margin-left: 0 !important;
+  }
+  
+  .sidebar-hidden {
+    display: none !important;
+  }
+}
