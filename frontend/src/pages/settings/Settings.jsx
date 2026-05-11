@@ -38,11 +38,15 @@ const Settings = () => {
   const fetchSettingsData = async () => {
     try {
       const token = localStorage.getItem('token');
+      const activeOrgId = localStorage.getItem('orgId');
+      
       const res = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      const currentOrg = res.data.organizations?.[0];
+      const organizations = res.data.organizations || [];
+      const currentOrg = organizations.find(o => (o.id || o.organization_id) === activeOrgId) || organizations[0];
+      
       if (currentOrg) {
         setProfile({
           first_name: currentOrg.first_name || '',
@@ -55,8 +59,9 @@ const Settings = () => {
           bio: currentOrg.bio || ''
         });
 
+        const targetOrgId = currentOrg.organization_id || currentOrg.id;
         // Fetch full org details
-        const orgRes = await axios.get(`http://127.0.0.1:8000/api/auth/organizations/${currentOrg.organization_id}/update/`, {
+        const orgRes = await axios.get(`http://127.0.0.1:8000/api/auth/organizations/${targetOrgId}/update/`, {
             headers: { Authorization: `Bearer ${token}` }
         });
         setOrganization(orgRes.data.data);

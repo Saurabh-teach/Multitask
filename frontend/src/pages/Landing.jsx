@@ -77,7 +77,7 @@ const Landing = () => {
                 <Target size={24} />
               </div>
               <h3 className="text-2xl font-bold mb-4 brand-font">Strategic Goals</h3>
-              <p className="text-gray-600 group-hover:text-blue-50/80">Set high-level goals (Epics) and track progress automatically based on linked tasks.</p>
+              <p className="text-gray-600 group-hover:text-blue-50/80">Set high-level goals and track progress automatically based on linked tasks.</p>
             </div>
 
             <div className="card-premium group hover:bg-indigo-600 hover:text-white transition-all duration-500">

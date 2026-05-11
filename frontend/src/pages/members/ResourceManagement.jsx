@@ -20,7 +20,7 @@ const ResourceManagement = () => {
   const [organizationName, setOrganizationName] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [userRole, setUserRole] = useState('member');
+  const [userRole, setUserRole] = useState('user');
   
   // Assignment Modal State
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -38,6 +38,17 @@ const ResourceManagement = () => {
 
   useEffect(() => {
     fetchInitialData();
+    
+    const handleOrgChange = () => {
+      const newOrgId = localStorage.getItem('orgId');
+      if (newOrgId) {
+        setLoading(true);
+        fetchTeamMembers(newOrgId);
+      }
+    };
+
+    window.addEventListener('storage', handleOrgChange);
+    return () => window.removeEventListener('storage', handleOrgChange);
   }, []);
 
   const fetchInitialData = async () => {
@@ -50,12 +61,13 @@ const ResourceManagement = () => {
       const myOrgs = orgRes.data.organizations || [];
       setOrganizations(myOrgs);
       
-      const orgId = myOrgs?.[0]?.organization_id || myOrgs?.[0]?.id;
-      if (orgId) {
-        setCurrentOrgId(orgId);
-        setUserRole(myOrgs[0].role || 'member');
-        setAssignmentData(prev => ({ ...prev, organization_id: orgId }));
-        fetchTeamMembers(orgId);
+      const activeOrgId = localStorage.getItem('orgId') || myOrgs?.[0]?.organization_id || myOrgs?.[0]?.id;
+      if (activeOrgId) {
+        setCurrentOrgId(activeOrgId);
+        const currentOrg = myOrgs.find(o => (o.organization_id || o.id) === activeOrgId);
+        setUserRole(currentOrg?.role || 'user');
+        setAssignmentData(prev => ({ ...prev, organization_id: activeOrgId }));
+        fetchTeamMembers(activeOrgId);
       }
       
       fetchTalentPool();
@@ -158,15 +170,32 @@ const ResourceManagement = () => {
     const roles = {
       owner: { color: 'bg-purple-50 text-purple-700 border-purple-100', icon: <Shield size={12} /> },
       admin: { color: 'bg-red-50 text-red-700 border-red-100', icon: <Shield size={12} /> },
-      manager: { color: 'bg-blue-50 text-blue-700 border-blue-100', icon: <Activity size={12} /> },
-      member: { color: 'bg-slate-50 text-slate-700 border-slate-200', icon: <Users size={12} /> },
+      user: { color: 'bg-blue-50 text-blue-700 border-blue-100', icon: <Users size={12} /> },
     };
-    const style = roles[role?.toLowerCase()] || roles.member;
+    const style = roles[role?.toLowerCase()] || roles.user;
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border ${style.color}`}>
         {style.icon}
         {role}
       </span>
+    );
+  };
+
+  const getPermissionIcons = (perms) => {
+    if (!perms) return null;
+    const icons = [];
+    if (perms.goal_create) icons.push({ icon: <Flag size={10} />, color: 'text-emerald-500', label: 'Goal Creator' });
+    if (perms.task_assign) icons.push({ icon: <Users size={10} />, color: 'text-blue-500', label: 'Assigner' });
+    if (perms.member_change_role) icons.push({ icon: <Shield size={10} />, color: 'text-indigo-500', label: 'Admin Access' });
+    
+    return (
+      <div className="flex gap-1 mt-1">
+        {icons.map((item, i) => (
+          <div key={i} title={item.label} className={`p-1 bg-white border border-gray-100 rounded-md shadow-sm ${item.color}`}>
+            {item.icon}
+          </div>
+        ))}
+      </div>
     );
   };
 
@@ -211,7 +240,7 @@ const ResourceManagement = () => {
                   className="pl-10 pr-4 py-2.5 bg-gray-50 border border-transparent rounded-2xl text-[14px] w-80 focus:bg-white focus:border-blue-500 transition-all outline-none"
                 />
               </div>
-              {['owner', 'admin', 'manager'].includes(userRole?.toLowerCase()) && (
+              {['owner', 'admin'].includes(userRole?.toLowerCase()) && (
                 <button 
                   onClick={() => navigate('/members/invite')}
                   className="btn-primary py-2.5 px-6 text-sm"
@@ -261,6 +290,7 @@ const ResourceManagement = () => {
                                   {getRoleBadge(person.role)}
                                 </div>
                                 <p className="text-[11px] text-gray-400 font-medium">{person.email}</p>
+                                {getPermissionIcons(person.permissions)}
                              </div>
                           </div>
                         </td>
@@ -304,7 +334,7 @@ const ResourceManagement = () => {
                            )}
                         </td>
                         <td className="py-6 px-10 text-right">
-                           {['owner', 'admin', 'manager'].includes(userRole?.toLowerCase()) && (
+                           {['owner', 'admin'].includes(userRole?.toLowerCase()) && (
                              <button 
                                onClick={() => handleOpenAssignModal(person)}
                                className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all flex items-center gap-2 ml-auto shadow-sm"
@@ -359,14 +389,14 @@ const ResourceManagement = () => {
 
                  <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                       <Layers size={14} /> Select Strategic Epic (Goal)
+                       <Layers size={14} /> Select Strategic Goal
                     </label>
                     <select 
                       className="input-premium py-3.5"
                       value={assignmentData.goal_id}
                       onChange={(e) => setAssignmentData({...assignmentData, goal_id: e.target.value})}
                     >
-                       <option value="">Any Epic / General</option>
+                       <option value="">Any Goal / General</option>
                        {modalGoals.map(g => (
                          <option key={g.id} value={g.id}>{g.title}</option>
                        ))}

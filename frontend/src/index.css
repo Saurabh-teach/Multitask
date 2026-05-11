@@ -1,93 +1,85 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --secondary: #64748b;
-  --accent: #f59e0b;
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --primary: #0052CC;
+  --primary-hover: #0747A6;
+  --secondary: #42526E;
+  --background: #F4F5F7;
+  --foreground: #172B4D;
   --card: #ffffff;
-  --border: #e2e8f0;
+  --border: #DFE1E6;
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--background);
-  color: var(--foreground);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: #F4F5F7;
+  color: #172B4D;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, .brand-font {
-  font-family: 'Outfit', sans-serif;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
-}
-
-@keyframes slideInRight {
-  from { transform: translateX(20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-.animate-slide-in {
-  animation: slideInRight 0.4s ease-out forwards;
-}
-
-/* Components */
-@layer components {
-  .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2;
-  }
-
-  .btn-secondary {
-    @apply bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2.5 px-6 rounded-xl border border-gray-200 transition-all duration-300 shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2;
-  }
-
-  .card-premium {
-    @apply bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 p-6;
-  }
-
-  .input-premium {
-    @apply w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300 text-[15px];
-  }
-
-  .glass-nav {
-    @apply bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50;
-  }
+h1, h2, h3, h4, h5, h6, .brand-font {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  color: #172B4D;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #F4F5F7;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-200 rounded-full hover:bg-gray-300 transition-colors;
+  background: #C1C7D0;
+  border-radius: 4px;
 }
 
-/* Responsive Layout */
-@media (max-width: 1023px) {
-  .lg\:ml-72 {
-    margin-left: 0 !important;
+::-webkit-scrollbar-thumb:hover {
+  background: #A5ADBA;
+}
+
+/* Jira-style Components */
+@layer components {
+  .btn-primary {
+    @apply bg-[#0052CC] hover:bg-[#0747A6] text-white font-medium py-2 px-4 rounded transition-all duration-200 flex items-center justify-center gap-2 text-sm;
   }
-  
-  .sidebar-hidden {
-    display: none !important;
+
+  .btn-secondary {
+    @apply bg-[#EBECF0] hover:bg-[#DFE1E6] text-[#42526E] font-medium py-2 px-4 rounded transition-all duration-200 flex items-center justify-center gap-2 text-sm;
   }
+
+  .card-jira {
+    @apply bg-white rounded shadow-sm border border-[#DFE1E6] hover:bg-[#F4F5F7] transition-all duration-200 p-4;
+  }
+
+  .input-jira {
+    @apply w-full px-3 py-2 bg-[#F4F5F7] border-2 border-transparent rounded focus:bg-white focus:border-[#4C9AFF] transition-all duration-200 text-sm outline-none;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 🎉 Confetti Animation */
+@keyframes confetti-fall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+.animate-confetti {
+  animation: confetti-fall 2.5s ease-in forwards;
 }

@@ -8,27 +8,25 @@ User = get_user_model()
 @database_sync_to_async
 def get_user(token_key):
     try:
-        access_token = AccessToken(token_key)
-        user_id = access_token['user_id']
+        token = AccessToken(token_key)
+        user_id = token.payload['user_id']
         return User.objects.get(id=user_id)
     except Exception:
         return AnonymousUser()
 
 class TokenAuthMiddleware:
-    """
-    Custom middleware that takes a token from the query string and authenticates the user.
-    """
     def __init__(self, inner):
         self.inner = inner
 
     async def __call__(self, scope, receive, send):
-        query_string = scope.get("query_string", b"").decode("utf-8")
-        query_params = dict(qp.split("=") for qp in query_string.split("&") if "=" in qp)
-        token_key = query_params.get("token")
-
+        query_string = scope.get("query_string", b"").decode()
+        token_key = None
+        if "token=" in query_string:
+            token_key = query_string.split("token=")[1]
+        
         if token_key:
             scope['user'] = await get_user(token_key)
         else:
             scope['user'] = AnonymousUser()
-
+            
         return await self.inner(scope, receive, send)

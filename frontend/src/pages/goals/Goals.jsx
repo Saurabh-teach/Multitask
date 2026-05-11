@@ -1,60 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../api/client';
 import { 
   Plus, Target, Filter, MoreHorizontal, Search, 
-  Calendar, User as UserIcon, ArrowRight, TrendingUp, AlertCircle, Trash2
+  Calendar, User as UserIcon, ArrowRight, TrendingUp, AlertCircle, Trash2,
+  Activity, Compass, ChevronRight
 } from 'lucide-react';
 import Sidebar from '../../components/layout/Sidebar';
 import { toast } from 'react-hot-toast';
 
 const Goals = () => {
+  const [orgId, setOrgId] = useState(localStorage.getItem('orgId'));
   const [goals, setGoals] = useState([]);
   const [filteredGoals, setFilteredGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  const [userRole, setUserRole] = useState('member');
+  const [userRole, setUserRole] = useState('user');
+  const [currentUserId, setCurrentUserId] = useState(null);
   const navigate = useNavigate();
-
-  const [currentOrgId, setCurrentOrgId] = useState(localStorage.getItem('orgId') || null);
-
+  
   useEffect(() => {
-    fetchGoals();
-    
-    // Listen for organization changes in the sidebar
     const handleOrgChange = () => {
-        const newOrgId = localStorage.getItem('orgId');
-        setCurrentOrgId(newOrgId);
-        setLoading(true);
+      setOrgId(localStorage.getItem('orgId'));
     };
     window.addEventListener('storage', handleOrgChange);
     return () => window.removeEventListener('storage', handleOrgChange);
-  }, [currentOrgId]);
+  }, []);
+
+  useEffect(() => {
+    if (orgId) {
+      fetchGoals();
+    }
+  }, [orgId]);
 
   const fetchGoals = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const activeOrgId = currentOrgId || localStorage.getItem('orgId');
+      setLoading(true);
+      const orgsRes = await apiClient.get('/my-organizations/');
+      const currentOrg = orgsRes.data.organizations?.find(o => (o.organization_id || o.id) === orgId);
       
-      if (activeOrgId) {
-        // Fetch Organization context first for user role
-        const orgRes = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const currentOrg = orgRes.data.organizations?.find(o => (o.organization_id || o.id) === activeOrgId);
-        
-        if (currentOrg) {
-          setUserRole(currentOrg.role || 'member');
-          const res = await axios.get(
-            `http://127.0.0.1:8000/api/auth/organizations/${activeOrgId}/goals/`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          setGoals(res.data);
-          setFilteredGoals(res.data);
-        }
+      if (currentOrg) {
+        setUserRole(currentOrg.role || 'user');
+        setCurrentUserId(currentOrg.user_id);
+        const res = await apiClient.get(`/organizations/${orgId}/goals/`);
+        setGoals(res.data);
+        setFilteredGoals(res.data);
       }
     } catch (err) {
-      console.error(err);
       toast.error('Failed to load goals');
     } finally {
       setLoading(false);
@@ -63,17 +55,14 @@ const Goals = () => {
 
   const handleDeleteGoal = async (e, goalId) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this goal? All associated tasks will be orphaned.")) return;
+    if (!window.confirm("Are you sure you want to delete this goal?")) return;
     
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`http://127.0.0.1:8000/api/auth/goals/${goalId}/delete/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiClient.delete(`/goals/${goalId}/delete/`);
       toast.success("Goal deleted");
       fetchGoals();
     } catch (err) {
-      toast.error("Failed to delete goal");
+      toast.error("Operation failed");
     }
   };
 
@@ -88,220 +77,157 @@ const Goals = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-      not_started: { label: 'To Do', color: 'bg-slate-100 text-slate-700 border-slate-200' },
-      in_progress: { label: 'In Progress', color: 'bg-blue-50 text-blue-700 border-blue-100' },
-      at_risk: { label: 'At Risk', color: 'bg-red-50 text-red-700 border-red-100' },
-      completed: { label: 'Done', color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+      not_started: { label: 'To Do', color: 'bg-[#EBECF0] text-[#42526E]' },
+      in_progress: { label: 'In Progress', color: 'bg-[#DEEBFF] text-[#0747A6]' },
+      at_risk: { label: 'At Risk', color: 'bg-[#FFEBE6] text-[#BF2600]' },
+      completed: { label: 'Done', color: 'bg-[#E3FCEF] text-[#006644]' },
     };
     const style = badges[status] || badges.not_started;
     return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border ${style.color}`}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase ${style.color}`}>
         {style.label}
       </span>
     );
   };
 
-  const getPriorityTag = (priority) => {
-    const tags = {
-      high: { color: 'text-red-500', bg: 'bg-red-500' },
-      medium: { color: 'text-blue-500', bg: 'bg-blue-500' },
-      low: { color: 'text-slate-400', bg: 'bg-slate-400' },
-    };
-    const style = tags[priority] || tags.medium;
-    return (
-      <div className="flex items-center gap-2">
-        <div className={`w-2 h-2 rounded-full ${style.bg}`} />
-        <span className={`text-[11px] font-bold uppercase tracking-widest ${style.color}`}>{priority}</span>
-      </div>
-    );
-  };
-
   return (
-    <div className="flex h-screen bg-[#f8fafc] overflow-hidden">
+    <div className="flex h-screen bg-[#F4F5F7] overflow-hidden font-sans text-[#172B4D]">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col h-screen overflow-hidden lg:ml-72 transition-all duration-300">
-        {/* Modern Navbar */}
-        <nav className="bg-white border-b border-gray-200 sticky top-0 z-40 w-full">
-          <div className="px-4 md:px-10 py-5 flex flex-wrap justify-between items-center gap-4">
+      <div className="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
+        {/* Header */}
+        <header className="bg-white border-b border-[#DFE1E6] shrink-0">
+          <div className="px-8 py-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-                 <Target size={24} />
-              </div>
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900 brand-font tracking-tight truncate">Strategic Goals</h1>
+               <h1 className="text-2xl font-semibold text-[#172B4D]">Goals</h1>
             </div>
             
-            <div className="flex items-center gap-3 md:gap-6 flex-1 justify-end min-w-fit">
-               <div className="relative group hidden sm:block">
-                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                 <input 
-                   type="text" 
-                   placeholder="Search..." 
-                   className="w-40 md:w-64 pl-10 pr-4 py-2 bg-gray-50 border border-transparent rounded-xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all outline-none"
-                 />
-               </div>
-               {['owner', 'admin', 'manager'].includes(userRole?.toLowerCase()) && (
-                <button 
-                  onClick={() => navigate('/goals/create')}
-                  className="btn-primary py-2.5 px-4 md:px-6 text-sm shrink-0 whitespace-nowrap"
-                >
-                  <Plus size={18} /> <span className="hidden xs:inline">Create New</span>
-                </button>
-              )}
+            <div className="flex items-center gap-4">
+              <div className="relative hidden md:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5E6C84]" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Search goals..." 
+                  className="pl-10 pr-4 py-2 bg-[#F4F5F7] border-2 border-transparent rounded focus:bg-white focus:border-[#4C9AFF] outline-none text-sm w-64 transition-all"
+                />
+              </div>
+              <button 
+                onClick={() => navigate('/goals/create')}
+                className="bg-[#0052CC] hover:bg-[#0747A6] text-white px-4 py-2 rounded font-medium text-sm transition-all flex items-center gap-2"
+              >
+                <Plus size={18} /> Create Goal
+              </button>
             </div>
           </div>
-        </nav>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-10 space-y-8 animate-fade-in">
-          
-          {/* Header Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all">
-                <div>
-                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Goals</p>
-                   <h3 className="text-3xl font-bold text-gray-900 brand-font">{goals.length}</h3>
-                </div>
-                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                   <Target size={24} />
-                </div>
-             </div>
-             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group hover:border-emerald-200 transition-all">
-                <div>
-                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">On Track</p>
-                   <h3 className="text-3xl font-bold text-gray-900 brand-font">{goals.filter(g => g.status === 'in_progress').length}</h3>
-                </div>
-                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                   <TrendingUp size={24} />
-                </div>
-             </div>
-             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group hover:border-red-200 transition-all">
-                <div>
-                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">At Risk</p>
-                   <h3 className="text-3xl font-bold text-gray-900 brand-font">{goals.filter(g => g.status === 'at_risk').length}</h3>
-                </div>
-                <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                   <AlertCircle size={24} />
-                </div>
-             </div>
-          </div>
-
-          {/* Filters Bar */}
-          <div className="flex items-center justify-between bg-white p-3 rounded-[1.5rem] border border-gray-100 shadow-sm">
+          <div className="px-8 py-2 bg-white flex items-center gap-6">
             <div className="flex items-center gap-1">
               {['all', 'not_started', 'in_progress', 'at_risk', 'completed'].map((status) => (
                 <button
                   key={status}
                   onClick={() => handleFilter(status)}
-                  className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-all ${
+                  className={`px-3 py-1.5 text-sm font-medium rounded transition-all ${
                     filter === status 
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' 
-                      : 'text-gray-500 hover:bg-gray-50'
+                      ? 'bg-[#EBECF0] text-[#0052CC]' 
+                      : 'text-[#5E6C84] hover:bg-[#F4F5F7] hover:text-[#172B4D]'
                   }`}
                 >
-                  {status === 'all' ? 'All Initiatives' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {status === 'all' ? 'All' : status.replace('_', ' ')}
                 </button>
               ))}
             </div>
-            
-            <button className="flex items-center gap-2 text-sm font-bold text-gray-600 bg-gray-50 px-5 py-2.5 rounded-xl hover:bg-gray-100 transition-colors">
-              <Filter size={18} /> Advanced Filter
-            </button>
           </div>
+        </header>
 
+        {/* Content */}
+        <main className="flex-1 overflow-y-auto p-8">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-               <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-               <p className="text-gray-500 font-bold">Synchronizing roadmap...</p>
+               <div className="w-8 h-8 border-2 border-[#0052CC] border-t-transparent rounded-full animate-spin" />
+               <p className="text-[#5E6C84] text-sm">Loading goals...</p>
             </div>
           ) : filteredGoals.length === 0 ? (
-            <div className="card-premium py-24 text-center border-dashed border-2">
-              <div className="w-20 h-20 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Target size={40} />
+            <div className="bg-white rounded border border-[#DFE1E6] p-20 text-center flex flex-col items-center shadow-sm">
+              <div className="text-[#DFE1E6] mb-6">
+                <Target size={48} />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 brand-font mb-3">No Goals Found</h3>
-              <p className="text-gray-500 mb-10 max-w-sm mx-auto font-medium">Capture your long-term objectives as Goals to start tracking progress effectively across your team.</p>
+              <h3 className="text-lg font-semibold text-[#172B4D] mb-2">No goals found</h3>
+              <p className="text-[#5E6C84] text-sm mb-8 max-w-xs mx-auto">Create a goal to start tracking progress across your workspace.</p>
               <button 
                 onClick={() => navigate('/goals/create')}
-                className="btn-primary text-lg px-10 py-4"
+                className="bg-[#0052CC] text-white px-6 py-2 rounded text-sm font-medium hover:bg-[#0747A6] transition-all"
               >
-                Create First Goal
+                Create your first goal
               </button>
             </div>
           ) : (
-            <div className="card-premium p-0 overflow-hidden shadow-xl">
+            <div className="bg-white rounded border border-[#DFE1E6] shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1000px]">
+                <table className="w-full text-left">
                   <thead>
-                    <tr className="bg-gray-50/50 border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-widest">
-                      <th className="py-5 px-8 w-12 text-center">Pri</th>
-                      <th className="py-5 px-6">Initiative Name</th>
-                      <th className="py-5 px-6 w-32">Status</th>
-                      <th className="py-5 px-6 w-48 text-center">Accountable</th>
-                      <th className="py-5 px-6 w-32 text-center">Due Date</th>
-                      <th className="py-5 px-6 w-72">Velocity & Progress</th>
-                      <th className="py-5 px-8 w-16 text-right"></th>
+                    <tr className="bg-[#F4F5F7] text-[#5E6C84] text-[11px] font-bold uppercase tracking-wider border-b border-[#DFE1E6]">
+                      <th className="py-4 px-6">Goal</th>
+                      <th className="py-4 px-6">Status</th>
+                      <th className="py-4 px-6">Owner</th>
+                      <th className="py-4 px-6">Deadline</th>
+                      <th className="py-4 px-6 w-64">Progress</th>
+                      <th className="py-4 px-6 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-[#DFE1E6]">
                     {filteredGoals.map((goal) => (
                       <tr 
                         key={goal.id} 
                         onClick={() => navigate(`/goals/${goal.id}`)}
-                        className="hover:bg-blue-50/20 transition-all cursor-pointer group"
+                        className="hover:bg-[#F4F5F7] transition-all cursor-pointer group"
                       >
-                        <td className="py-6 px-8 text-center">
-                          {getPriorityTag(goal.priority)}
+                        <td className="py-4 px-6">
+                          <div>
+                            <div className="font-medium text-[#172B4D] group-hover:text-[#0052CC]">{goal.title}</div>
+                            <div className="text-xs text-[#5E6C84] truncate max-w-xs mt-0.5">{goal.description || "No description provided."}</div>
+                          </div>
                         </td>
-                        <td className="py-6 px-6">
-                          <div className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors text-[15px]">{goal.title}</div>
-                          {goal.description && (
-                            <div className="text-[11px] text-gray-400 font-medium truncate mt-1 max-w-md">{goal.description}</div>
-                          )}
-                        </td>
-                        <td className="py-6 px-6">
+                        <td className="py-4 px-6">
                           {getStatusBadge(goal.status)}
                         </td>
-                        <td className="py-6 px-6">
-                          <div className="flex items-center justify-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-[11px] shadow-md">
-                              {goal.owner ? (goal.owner.username ? goal.owner.username.substring(0, 2).toUpperCase() : 'U') : '?'}
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-[#0052CC] flex items-center justify-center text-white font-bold text-[10px]">
+                              {(goal.owner_name || 'U')[0].toUpperCase()}
                             </div>
-                            <span className="text-sm font-bold text-gray-700">{goal.owner ? goal.owner.username : 'Unassigned'}</span>
+                            <span className="text-sm text-[#172B4D]">{goal.owner_name || 'Unassigned'}</span>
                           </div>
                         </td>
-                        <td className="py-6 px-6 text-center">
-                          <div className="inline-flex items-center gap-2 text-[12px] font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
-                            <Calendar size={14} />
-                            {goal.due_date ? new Date(goal.due_date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'}) : '--'}
-                          </div>
+                        <td className="py-4 px-6">
+                          <span className="text-sm text-[#172B4D]">{goal.due_date ? new Date(goal.due_date).toLocaleDateString() : '--'}</span>
                         </td>
-                        <td className="py-6 px-6">
-                          <div className="flex items-center gap-4">
-                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <td className="py-4 px-6">
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-[10px] font-bold text-[#5E6C84]">
+                               <span>{Math.round(goal.progress)}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-[#EBECF0] rounded-full overflow-hidden">
                               <div 
                                 className={`h-full rounded-full transition-all duration-1000 ${
-                                  goal.progress === 100 ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
+                                  goal.progress === 100 ? 'bg-[#36B37E]' : 'bg-[#0052CC]'
                                 }`} 
                                 style={{ width: `${goal.progress}%` }}
                               />
                             </div>
-                            <span className="text-[12px] font-bold text-gray-900 w-10 text-right">{Math.round(goal.progress)}%</span>
                           </div>
                         </td>
-                        <td className="py-6 px-8 text-right">
-                          <div className="flex justify-end gap-2">
-                            {['owner', 'admin'].includes(userRole?.toLowerCase()) && (
+                        <td className="py-4 px-6 text-right">
+                          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            {(['owner', 'admin'].includes(userRole?.toLowerCase()) || goal.created_by === currentUserId) && (
                               <button 
                                 onClick={(e) => handleDeleteGoal(e, goal.id)}
-                                className="text-gray-300 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                                title="Delete Epic"
+                                className="p-1.5 text-[#C1C7D0] hover:text-[#DE350B] hover:bg-[#FFEBE6] rounded transition-all"
                               >
-                                <Trash2 size={20} />
+                                <Trash2 size={16} />
                               </button>
                             )}
-                            <button className="text-gray-300 hover:text-gray-900 p-2 rounded-xl hover:bg-gray-100 transition-all opacity-0 group-hover:opacity-100">
-                              <MoreHorizontal size={20} />
+                            <button className="p-1.5 text-[#C1C7D0] hover:text-[#172B4D] hover:bg-[#EBECF0] rounded transition-all">
+                              <MoreHorizontal size={16} />
                             </button>
                           </div>
                         </td>
@@ -312,7 +238,7 @@ const Goals = () => {
               </div>
             </div>
           )}
-        </div>
+        </main>
       </div>
     </div>
   );

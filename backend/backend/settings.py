@@ -25,8 +25,16 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'channels',
+    'core',
 
-    'accounts',
+    'users',
+    'organizations',
+    'goals',
+    'tasks',
+    'chat',
+    'activity_logs',
+    'dashboard',
+    'notifications',
 ]
 
 ASGI_APPLICATION = 'backend.asgi.application'
@@ -87,7 +95,7 @@ DATABASES = {
     }
 }
 
-AUTH_USER_MODEL = 'accounts.User'
+AUTH_USER_MODEL = 'users.User'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",

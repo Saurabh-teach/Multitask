@@ -238,14 +238,14 @@ const TalentPool = () => {
 
                  <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                       <Layers size={14} /> Strategic Epic
+                       <Layers size={14} /> Strategic Goal
                     </label>
                     <select 
                       className="input-premium py-3.5"
                       value={assignmentData.goal_id}
                       onChange={(e) => setAssignmentData({...assignmentData, goal_id: e.target.value})}
                     >
-                       <option value="">Any Epic / General</option>
+                       <option value="">Any Goal / General</option>
                        {modalGoals.map(g => (
                          <option key={g.id} value={g.id}>{g.title}</option>
                        ))}

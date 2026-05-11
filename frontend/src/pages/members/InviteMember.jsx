@@ -14,7 +14,7 @@ const InviteMember = () => {
   const [inviteLink, setInviteLink] = useState('');
   const [formData, setFormData] = useState({
     email: '',
-    role: 'member'
+    role: 'user'
   });
 
   const handleGenerateLink = async () => {
@@ -166,7 +166,7 @@ const InviteMember = () => {
                         </label>
                         <div className="grid grid-cols-1 gap-4">
                            {[
-                             { id: 'member', title: 'Regular Member', desc: 'Can create and manage their own tasks and goals.' },
+                             { id: 'user', title: 'Regular User', desc: 'Can view and update tasks assigned to them.' },
                              { id: 'admin', title: 'Administrator', desc: 'Full control over settings, members, and all data.' }
                            ].map(role => (
                              <button

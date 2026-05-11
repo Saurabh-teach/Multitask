@@ -6,7 +6,10 @@ from django.utils import timezone
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
-from accounts.models import User, Organization, OrganizationMember, Goal, Task
+from users.models import User
+from organizations.models import Organization, OrganizationMember
+from goals.models import Goal
+from tasks.models import Task
 
 def seed_saurabh_org():
     print("Seeding Saurabh's Organization...")
@@ -47,7 +50,7 @@ def seed_saurabh_org():
         OrganizationMember.objects.get_or_create(
             organization=org,
             user=user,
-            defaults={'role': 'member'}
+            defaults={'role': 'user'}
         )
         employees.append(user)
         print(f"Added employee: {user.username}")

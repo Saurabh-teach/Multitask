@@ -7,7 +7,10 @@ from datetime import timedelta
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
-from accounts.models import User, Organization, OrganizationMember, Goal, Task
+from users.models import User
+from organizations.models import Organization, OrganizationMember
+from goals.models import Goal
+from tasks.models import Task
 
 def seed_db():
     print("Starting Enterprise-Grade Database Seeding...")
@@ -73,9 +76,9 @@ def seed_db():
 
     OrganizationMember.objects.get_or_create(organization=org, user=owner, defaults={'role': 'owner'})
     for member in team:
-        OrganizationMember.objects.get_or_create(organization=org, user=member, defaults={'role': 'member'})
+        OrganizationMember.objects.get_or_create(organization=org, user=member, defaults={'role': 'user'})
 
-    epics_data = [
+    goals_data = [
         {
             'title': "Q3 SaaS Platform Overhaul",
             'desc': "Complete redesign of the core SaaS interface to support enterprise multi-tenancy and advanced analytics.",
@@ -94,9 +97,9 @@ def seed_db():
         }
     ]
 
-    epics = []
-    for e in epics_data:
-        epic = Goal.objects.create(
+    goals = []
+    for e in goals_data:
+        goal = Goal.objects.create(
             organization=org,
             title=e['title'],
             description=e['desc'],
@@ -105,24 +108,24 @@ def seed_db():
             status=e['status'],
             due_date=e['due']
         )
-        epics.append(epic)
-    print("Strategic Epics Established.")
+        goals.append(goal)
+    print("Strategic Goals Established.")
 
     tasks_data = [
-        {'title': "Implement OAuth2.0 SSO", 'status': 'done', 'pri': 'urgent', 'type': 'task', 'epic': epics[0], 'assignee': users[1]},
-        {'title': "Redesign Dashboard Layout", 'status': 'in_review', 'pri': 'high', 'type': 'story', 'epic': epics[0], 'assignee': users[2]},
-        {'title': "Database Migration to PostgreSQL", 'status': 'in_progress', 'pri': 'high', 'type': 'task', 'epic': epics[0], 'assignee': users[1]},
-        {'title': "Setup CI/CD Pipeline", 'status': 'todo', 'pri': 'medium', 'type': 'task', 'epic': epics[0], 'assignee': users[3]},
-        {'title': "Fix CSS break on Safari", 'status': 'testing', 'pri': 'high', 'type': 'bug', 'epic': epics[0], 'assignee': users[2]},
+        {'title': "Implement OAuth2.0 SSO", 'status': 'done', 'pri': 'urgent', 'type': 'task', 'goal': goals[0], 'assignee': users[1]},
+        {'title': "Redesign Dashboard Layout", 'status': 'in_review', 'pri': 'high', 'type': 'story', 'goal': goals[0], 'assignee': users[2]},
+        {'title': "Database Migration to PostgreSQL", 'status': 'in_progress', 'pri': 'high', 'type': 'task', 'goal': goals[0], 'assignee': users[1]},
+        {'title': "Setup CI/CD Pipeline", 'status': 'todo', 'pri': 'medium', 'type': 'task', 'goal': goals[0], 'assignee': users[3]},
+        {'title': "Fix CSS break on Safari", 'status': 'testing', 'pri': 'high', 'type': 'bug', 'goal': goals[0], 'assignee': users[2]},
         
-        {'title': "GDPR Data Processing Audit", 'status': 'backlog', 'pri': 'urgent', 'type': 'task', 'epic': epics[1], 'assignee': users[1]},
-        {'title': "Localized Landing Pages (FR/DE)", 'status': 'todo', 'pri': 'medium', 'type': 'story', 'epic': epics[1], 'assignee': users[2]},
+        {'title': "GDPR Data Processing Audit", 'status': 'backlog', 'pri': 'urgent', 'type': 'task', 'goal': goals[1], 'assignee': users[1]},
+        {'title': "Localized Landing Pages (FR/DE)", 'status': 'todo', 'pri': 'medium', 'type': 'story', 'goal': goals[1], 'assignee': users[2]},
     ]
 
     for t in tasks_data:
         task = Task.objects.create(
             organization=org,
-            goal=t['epic'],
+            goal=t['goal'],
             title=t['title'],
             issue_type=t['type'],
             status=t['status'],
@@ -132,8 +135,8 @@ def seed_db():
         )
         task.assignees.add(t['assignee'])
     
-    for epic in epics:
-        epic.update_progress()
+    for goal in goals:
+        goal.update_progress()
 
     print("Seeding Complete! Application is now populated with Jira-style data.")
     print(f"Login: Saurabh101 / Saurabh@123")

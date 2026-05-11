@@ -7,7 +7,10 @@ from datetime import datetime, timedelta
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
-from accounts.models import User, Organization, OrganizationMember, Goal, Task
+from users.models import User
+from organizations.models import Organization, OrganizationMember
+from goals.models import Goal
+from tasks.models import Task
 
 def seed_data():
     print("Starting Strategic Seed for 'Saurabh Bhangale Team'...")
@@ -54,7 +57,7 @@ def seed_data():
         member, m_created = OrganizationMember.objects.get_or_create(
             organization=org,
             user=user,
-            defaults={'role': 'member'}
+            defaults={'role': 'user'}
         )
         members.append(user)
         print(f"Added Member: {emp['name']} - {emp['title']}")

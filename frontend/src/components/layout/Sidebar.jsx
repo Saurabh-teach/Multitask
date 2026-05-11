@@ -1,183 +1,194 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { AuthContext } from '../../context/AuthContext';
+import apiClient from '../../api/client';
 import { 
   LayoutDashboard, ListTodo, Target, Users, 
-  Building2, LogOut, Settings, HelpCircle, ChevronRight, MessageSquare
+  Building2, LogOut, Settings, HelpCircle, ChevronRight, MessageSquare, Shield, BarChart3,
+  ChevronDown
 } from 'lucide-react';
 
 const Sidebar = () => {
-  const { token } = React.useContext(AuthContext);
-  const [profile, setProfile] = useState({
-    name: 'Loading...',
-    role: '',
-    avatar: ''
-  });
-  const [goals, setGoals] = useState([]);
+  const { token, logout, currentOrgId, setCurrentOrgId, permissions } = useContext(AuthContext);
+  const [profile, setProfile] = useState({ name: 'Loading...', role: 'Team Member' });
   const [organizations, setOrganizations] = useState([]);
-  const [currentOrgId, setCurrentOrgId] = useState(localStorage.getItem('orgId') || null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchInitialData();
+    if (token) {
+      fetchOrganizations();
+    }
   }, [token, currentOrgId]);
 
-  const fetchInitialData = async () => {
+  const fetchOrganizations = async () => {
     try {
-      const activeToken = token || localStorage.getItem('token');
-      const res = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
-        headers: { Authorization: `Bearer ${activeToken}` }
-      });
-      
+      const res = await apiClient.get('/my-organizations/');
       const orgs = res.data.organizations || [];
       setOrganizations(orgs);
 
-      // If no org selected yet, pick the first one
-      let selectedOrg = orgs.find(o => o.id === currentOrgId || o.organization_id === currentOrgId);
-      if (!selectedOrg && orgs.length > 0) {
-          selectedOrg = orgs[0];
-          const newId = selectedOrg.organization_id || selectedOrg.id;
-          setCurrentOrgId(newId);
-          localStorage.setItem('orgId', newId);
+      console.log("Organizations loaded in Sidebar:", orgs.map(o => o.id || o.organization_id));
+      // Initial validation of stored ID
+      const currentId = localStorage.getItem('orgId');
+      console.log("Current stored orgId:", currentId);
+      
+      let selectedOrg = orgs.find(o => (o.id || o.organization_id) === currentId);
+      console.log("Found selectedOrg in list?", !!selectedOrg);
+      
+      if (!selectedOrg) {
+          if (orgs.length > 0) {
+              const firstOrg = orgs[0];
+              const firstId = firstOrg.organization_id || firstOrg.id;
+              console.log("CRITICAL: Stale/Empty selection detected. Forcing update to:", firstId);
+              setCurrentOrgId(firstId);
+              localStorage.setItem('orgId', firstId);
+              window.dispatchEvent(new Event('storage'));
+              selectedOrg = firstOrg;
+          } else {
+              console.log("CRITICAL: No organizations available. Clearing orgId.");
+              setCurrentOrgId(null);
+              localStorage.removeItem('orgId');
+              window.dispatchEvent(new Event('storage'));
+          }
       }
 
       if (selectedOrg) {
-        const targetId = selectedOrg.organization_id || selectedOrg.id;
-        const fullName = `${selectedOrg.first_name || ''} ${selectedOrg.last_name || ''}`.trim();
-        setProfile({
-          name: fullName || selectedOrg.username || 'Team Member',
-          role: selectedOrg.role?.charAt(0).toUpperCase() + selectedOrg.role?.slice(1) || ''
-        });
-
-        // Fetch Goals for the selected organization
-        const goalsRes = await axios.get(`http://127.0.0.1:8000/api/auth/organizations/${targetId}/goals/`, {
-          headers: { Authorization: `Bearer ${activeToken}` }
-        });
-        setGoals(goalsRes.data);
+        updateProfile(selectedOrg);
       }
     } catch (err) {
-      console.error('Sidebar error:', err);
+      console.error("Failed to fetch organizations:", err);
     }
   };
 
+  const updateProfile = (org) => {
+    const fullName = `${org.first_name || ''} ${org.last_name || ''}`.trim();
+    setProfile({
+      name: fullName || org.username || 'Team Member',
+      role: org.role?.charAt(0).toUpperCase() + org.role?.slice(1) || ''
+    });
+  };
+
+  useEffect(() => {
+    // When currentOrgId changes (manual or storage event), update the profile info
+    if (organizations.length > 0 && currentOrgId) {
+      const selected = organizations.find(o => (o.id || o.organization_id) === currentOrgId);
+      if (selected) {
+        updateProfile(selected);
+      }
+    }
+  }, [currentOrgId, organizations]);
+
   const handleOrgChange = (id) => {
+      console.log("Switching to organization:", id);
       setCurrentOrgId(id);
       localStorage.setItem('orgId', id);
-      // Trigger a page refresh or event to update other components
       window.dispatchEvent(new Event('storage')); 
   };
 
   const navItems = [
-    { to: '/dashboard', label: 'Your Work', icon: LayoutDashboard, category: 'Planning' },
+    { to: '/dashboard', label: 'My Work', icon: LayoutDashboard, category: 'Personal' },
     { to: '/goals', label: 'All Goals', icon: Target },
-    { to: '/tasks', label: 'Sprint Board', icon: ListTodo },
+    { to: '/tasks', label: 'All Tasks', icon: ListTodo },
+    { to: '/board', label: 'Sprint Board', icon: BarChart3 },
     { to: '/members', label: 'Our Team', icon: Users, category: 'Workspace' },
     { to: `/chat/${currentOrgId}`, label: 'Messenger', icon: MessageSquare, category: 'Communication' },
-    { to: '/talent-pool', label: 'Member Pool', icon: Users, roles: ['Owner', 'Admin', 'Manager'] },
-    { to: '/organizations', label: 'Organizations', icon: Building2, roles: ['Owner', 'Admin'] },
+    { to: '/talent-pool', label: 'Member Pool', icon: Users, permission: 'member_invite' },
+    { to: '/organizations', label: 'Organizations', icon: Building2, permission: 'org_edit' },
+    { to: '/permissions', label: 'Work Permissions', icon: Shield, permission: 'member_change_role', category: 'Workspace' },
+    { to: '/reports', label: 'Reports', icon: BarChart3, category: 'Workspace' },
   ];
 
   const filteredItems = navItems.filter(item => {
-    if (!item.roles) return true;
-    return item.roles.includes(profile.role);
+    if (!item.permission) return true;
+    return permissions && permissions.includes(item.permission);
   });
 
+  const handleLogout = () => {
+    logout();
+    localStorage.removeItem('orgId');
+    navigate('/login');
+    window.location.reload();
+  };
+
   return (
-    <div className="w-72 h-screen bg-white text-gray-700 flex flex-col fixed left-0 top-0 border-r border-gray-200 shadow-[2px_0_15_rgba(0,0,0,0.02)] z-50 overflow-y-auto">
+    <div className="w-64 h-screen bg-[#FAFBFC] text-[#42526E] flex flex-col fixed left-0 top-0 border-r border-[#DFE1E6] z-50 overflow-y-auto font-sans">
       
-      {/* Logo Header */}
-      <div className="px-8 py-8 flex flex-col gap-6">
+      {/* Header */}
+      <div className="px-6 py-6 flex flex-col gap-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/20">
+          <div className="w-8 h-8 bg-[#0052CC] rounded flex items-center justify-center text-white font-bold text-lg">
             G
           </div>
-          <div>
-            <div className="text-xl font-bold tracking-tight text-gray-900 brand-font">GoalFlow</div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Execute Together</p>
-          </div>
+          <span className="text-xl font-semibold text-[#172B4D]">GoalFlow</span>
         </div>
 
-        {/* Organization Switcher */}
-        <div className="space-y-2">
-           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Active Workspace</label>
-           <div className="relative group">
-              <select 
-                value={currentOrgId || ''}
-                onChange={(e) => handleOrgChange(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-[13px] font-bold text-gray-700 appearance-none focus:ring-2 focus:ring-blue-500/10 outline-none cursor-pointer transition-all pr-10"
-              >
-                {organizations.map(org => (
-                  <option key={org.id || org.organization_id} value={org.id || org.organization_id}>
-                    {org.organization_name || org.name}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                 <ChevronRight size={16} className="rotate-90" />
-              </div>
-           </div>
+        {/* Org Switcher */}
+        <div className="relative group">
+          <select 
+            value={currentOrgId || ''}
+            onChange={(e) => handleOrgChange(e.target.value)}
+            className="w-full bg-white border border-[#DFE1E6] rounded px-3 py-2 text-sm font-medium text-[#172B4D] appearance-none focus:border-[#4C9AFF] outline-none cursor-pointer transition-all pr-8"
+          >
+            {organizations.map(org => (
+              <option key={org.id || org.organization_id} value={org.id || org.organization_id}>
+                {org.organization_name || org.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#5E6C84]" />
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-2 space-y-0.5">
         {filteredItems.map((item, index) => (
           <React.Fragment key={item.to}>
             {item.category && (
-              <div className="px-4 mt-6 mb-2">
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</p>
+              <div className="px-3 mt-6 mb-2">
+                <p className="text-[11px] font-bold text-[#5E6C84] uppercase tracking-wider">{item.category}</p>
               </div>
             )}
             <NavLink 
               to={item.to} 
-              className={({ isActive }) => `group flex items-center justify-between px-4 py-3 rounded-xl text-[14px] font-semibold transition-all duration-300 ${isActive ? 'bg-blue-50 text-blue-600 shadow-sm' : 'hover:bg-gray-50 text-gray-600'}`}
+              className={({ isActive }) => `group flex items-center gap-3 px-3 py-2 rounded text-[14px] transition-all ${isActive ? 'bg-[#EBECF0] text-[#0052CC] font-semibold' : 'hover:bg-[#EBECF0] text-[#42526E] hover:text-[#172B4D]'}`}
             >
-              {({ isActive }) => (
-                <>
-                  <div className="flex items-center gap-3">
-                    <item.icon size={20} className={isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-600 transition-colors'} />
-                    <span>{item.label}</span>
-                  </div>
-                  <ChevronRight size={14} className={`transition-all duration-300 ${isActive ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0'}`} />
-                </>
-              )}
+              <item.icon size={18} className="shrink-0" />
+              <span>{item.label}</span>
             </NavLink>
           </React.Fragment>
         ))}
       </nav>
 
-      {/* Footer Area */}
-      <div className="p-6 bg-gray-50/50 mt-auto">
-        <div className="space-y-1 mb-6">
+      {/* Footer */}
+      <div className="p-4 bg-white border-t border-[#DFE1E6] mt-auto">
+        <div className="space-y-0.5 mb-4">
           <NavLink 
             to="/settings" 
-            className={({ isActive }) => `w-full flex items-center gap-3 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all duration-300 ${isActive ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-white hover:text-blue-600 hover:shadow-sm'}`}
+            className="flex items-center gap-3 px-3 py-2 rounded text-[13px] text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-all"
           >
-            <Settings size={18} /> Settings
+            <Settings size={16} /> Settings
           </NavLink>
-          <button className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-[13px] font-semibold text-gray-500 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all duration-300">
-            <HelpCircle size={18} /> Help Center
-          </button>
+          <NavLink 
+            to="/help" 
+            className="flex items-center gap-3 px-3 py-2 rounded text-[13px] text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D] transition-all"
+          >
+            <HelpCircle size={16} /> Help Center
+          </NavLink>
         </div>
 
-        <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-gray-100 shadow-sm">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-md uppercase">
+        <div className="flex items-center gap-3 p-2 rounded hover:bg-[#EBECF0] transition-all cursor-pointer group">
+          <div className="w-8 h-8 bg-[#0052CC] rounded flex items-center justify-center text-white font-bold text-xs uppercase">
             {profile.name.charAt(0)}
-            {profile.name.split(' ').length > 1 ? profile.name.split(' ')[1].charAt(0) : ''}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="font-bold text-[13px] text-gray-900 truncate">{profile.name}</p>
-            <p className="text-[11px] text-gray-500 font-medium truncate">{profile.role}</p>
+            <p className="text-sm font-medium text-[#172B4D] truncate leading-tight">{profile.name}</p>
+            <p className="text-xs text-[#5E6C84] truncate">{profile.role}</p>
           </div>
           <button 
-            onClick={() => {
-              localStorage.removeItem('token');
-              window.location.href = '/login';
-            }}
-            className="text-gray-400 hover:text-red-500 transition-colors p-1"
+            onClick={handleLogout}
+            className="text-[#5E6C84] hover:text-[#DE350B] p-1.5 rounded hover:bg-[#FFEBE6] transition-all"
             title="Logout"
           >
-            <LogOut size={18} />
+            <LogOut size={16} />
           </button>
         </div>
       </div>
