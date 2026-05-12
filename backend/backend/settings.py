@@ -34,6 +34,9 @@ INSTALLED_APPS = [
     'chat',
     'activity_logs',
     'dashboard',
+    'calculations',
+    'invitations',
+    'join_requests',
     'notifications',
 ]
 
@@ -124,3 +127,22 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ==============================
+# Email Configuration (Gmail SMTP)
+# ==============================
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+if EMAIL_HOST_PASSWORD and EMAIL_HOST_PASSWORD != 'PASTE_YOUR_16_CHAR_APP_PASSWORD_HERE':
+    # Real Email Delivery
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.gmail.com'
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+else:
+    # Development/Testing - Prints email to the terminal instead of sending
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+DEFAULT_FROM_EMAIL = f"GoalFlow <{os.environ.get('EMAIL_HOST_USER', 'noreply@goalflow.ai')}>"
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')

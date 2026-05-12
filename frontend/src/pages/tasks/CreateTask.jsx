@@ -5,7 +5,7 @@ import Sidebar from '../../components/layout/Sidebar';
 import { 
   ListTodo, Calendar, Users, AlignLeft, 
   ArrowLeft, Plus, ShieldCheck, Flag, Layers,
-  Eye, Lock, Shield, Search, X, CheckCircle2, Building
+  Eye, Lock, Shield, Search, X, CheckCircle2, Building, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { AuthContext } from '../../context/AuthContext';
@@ -22,6 +22,7 @@ const CreateTask = () => {
   const [members, setMembers] = useState([]);
   const [goals, setGoals] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [goalDropdownOpen, setGoalDropdownOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -142,7 +143,7 @@ const CreateTask = () => {
               >
                 <ArrowLeft size={20} />
               </button>
-              <h1 className="text-2xl font-bold text-gray-900 brand-font tracking-tight">Create New Issue</h1>
+              <h1 className="text-2xl font-bold text-gray-900 brand-font tracking-tight">Create New Task</h1>
             </div>
             <div className="flex items-center gap-2 text-indigo-600 text-xs font-bold uppercase tracking-widest">
                <Layers size={16} /> Goal Execution
@@ -169,17 +170,78 @@ const CreateTask = () => {
                         <label className="text-[12px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
                            <Layers size={14} /> Parent Strategic Goal <span className="text-red-500">*</span>
                         </label>
-                        <select 
-                          required
-                          className="input-premium py-4 appearance-none"
-                          value={formData.goal}
-                          onChange={(e) => setFormData({...formData, goal: e.target.value})}
-                        >
-                          <option value="">Select a goal...</option>
-                          {goals.map(g => (
-                            <option key={g.id} value={g.id}>{g.title}</option>
-                          ))}
-                        </select>
+
+                        <div className="relative">
+                          {/* Trigger Button */}
+                          <button
+                            type="button"
+                            onClick={() => setGoalDropdownOpen(prev => !prev)}
+                            className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl border-2 transition-all text-left ${
+                              formData.goal
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${ formData.goal ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-400' }`}>
+                                <Layers size={15} />
+                              </div>
+                              <span className={`text-sm font-bold ${ formData.goal ? 'text-blue-900' : 'text-gray-400' }`}>
+                                {formData.goal
+                                  ? goals.find(g => g.id === formData.goal)?.title || 'Selected'
+                                  : 'Select a goal...'}
+                              </span>
+                            </div>
+                            {goalDropdownOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                          </button>
+
+                          {/* Dropdown List */}
+                          {goalDropdownOpen && (
+                            <div className="absolute z-50 mt-2 w-full bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+                              {goals.length === 0 ? (
+                                <div className="p-6 text-center">
+                                  <p className="text-sm text-gray-400 font-medium">No goals yet. <a href="/goals/create" className="text-blue-600 font-bold">Create one →</a></p>
+                                </div>
+                              ) : (
+                                <div className="max-h-56 overflow-y-auto divide-y divide-gray-50">
+                                  {goals.map(g => {
+                                    const isSelected = formData.goal === g.id;
+                                    const statusColor = {
+                                      completed: 'bg-green-100 text-green-700',
+                                      in_progress: 'bg-blue-100 text-blue-700',
+                                      on_hold: 'bg-amber-100 text-amber-700',
+                                      not_started: 'bg-gray-100 text-gray-500',
+                                    }[g.status] || 'bg-gray-100 text-gray-500';
+                                    return (
+                                      <button
+                                        key={g.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setFormData({...formData, goal: g.id});
+                                          setGoalDropdownOpen(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between px-5 py-3.5 hover:bg-blue-50 transition-all text-left ${ isSelected ? 'bg-blue-50' : '' }`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${ isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400' }`}>
+                                            <Layers size={13} />
+                                          </div>
+                                          <div>
+                                            <p className={`text-sm font-bold ${ isSelected ? 'text-blue-700' : 'text-gray-800' }`}>{g.title}</p>
+                                            <p className="text-[10px] text-gray-400">{Math.round(g.progress || 0)}% complete</p>
+                                          </div>
+                                        </div>
+                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${statusColor}`}>
+                                          {(g.status || 'active').replace('_', ' ')}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="space-y-2">
@@ -219,11 +281,11 @@ const CreateTask = () => {
                            <AlignLeft size={14} /> Description & Requirements
                         </label>
                         <textarea
-                          rows="3"
+                          rows="6"
                           value={formData.description}
                           onChange={(e) => setFormData({...formData, description: e.target.value})}
-                          className="input-premium py-4"
-                          placeholder="Detail the technical requirements and acceptance criteria..."
+                          className="w-full border-2 border-gray-100 rounded-2xl px-5 py-4 text-sm text-gray-700 placeholder:text-gray-300 focus:border-blue-500 focus:outline-none resize-none transition-all bg-gray-50 focus:bg-white"
+                          placeholder="Detail the technical requirements, acceptance criteria, and any relevant context..."
                         />
                       </div>
 

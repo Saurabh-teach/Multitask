@@ -3,8 +3,8 @@ from organizations.views import (
     SetupWorkspaceView, CreateOrganizationView, MyOrganizationsView, 
     OrganizationMembersView, UpdateMemberPermissionsView, 
     InviteTeamView, JoinWorkspaceView, AvailableTalentView, 
-    GenerateInviteLinkView, OrganizationUpdateView,
-    SendJoinRequestView, ManageJoinRequestView, RemoveMemberView, JoinViaInviteView
+    GenerateInviteLinkView, OrganizationUpdateView, RemoveMemberView, JoinViaInviteView,
+    SearchOrganizationView
 )
 
 urlpatterns = [
@@ -18,8 +18,8 @@ urlpatterns = [
     path('join-workspace/<str:token>/', JoinWorkspaceView.as_view(), name='join-workspace'),
     path('talent-pool/', AvailableTalentView.as_view(), name='talent-pool'),
     path('organizations/<uuid:org_id>/invite-link/', GenerateInviteLinkView.as_view(), name='invite-link'),
-    path('organizations/join-request/', SendJoinRequestView.as_view(), name='send-join-request'),
-    path('organizations/join-request/<uuid:request_id>/manage/', ManageJoinRequestView.as_view(), name='manage-join-request'),
+    path('search-organizations/', SearchOrganizationView.as_view(), name='search-organizations'),
+
     path('organizations/members/<uuid:member_id>/remove/', RemoveMemberView.as_view(), name='remove-member'),
     path('organizations/join/invite-code/<str:code>/', JoinViaInviteView.as_view(), name='join-via-invite'),
 ]

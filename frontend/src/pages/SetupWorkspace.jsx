@@ -43,7 +43,15 @@ const SetupWorkspace = () => {
 
         <div className="space-y-2 mb-8">
             <h2 className="text-3xl font-bold text-gray-900 brand-font">Name your workspace</h2>
-            <p className="text-gray-500 font-medium">This is where your team will collaborate on goals.</p>
+            
+            <div className="flex items-center gap-2 my-6">
+              <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+              <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+              <div className="flex-1 h-1.5 bg-gray-100 rounded-full"></div>
+              <div className="flex-1 h-1.5 bg-gray-100 rounded-full"></div>
+            </div>
+            
+            <p className="text-gray-500 font-medium text-sm">Step 2: This is where your team will collaborate on goals.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

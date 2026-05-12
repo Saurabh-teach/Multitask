@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from organizations.models import Organization, OrganizationMember, JoinRequest
+from organizations.models import Organization, OrganizationMember
 from users.serializers import UserSerializer
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -11,7 +11,8 @@ class OrganizationSerializer(serializers.ModelSerializer):
                   'logo', 'is_public', 'created_at', 'member_count']
 
     def get_member_count(self, obj):
-        return obj.members.filter(is_active=True).count()
+        from calculations.services import OrganizationCalculator
+        return OrganizationCalculator.get_member_count(obj)
 
 class OrganizationMemberSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -20,17 +21,3 @@ class OrganizationMemberSerializer(serializers.ModelSerializer):
         model = OrganizationMember
         fields = ['id', 'user', 'role', 'joined_at', 'is_active']
 
-class JoinRequestSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    organization = OrganizationSerializer(read_only=True)
-    
-    class Meta:
-        model = JoinRequest
-        fields = ['id', 'organization', 'user', 'message', 'status', 
-                  'requested_at', 'reviewed_at']
-        read_only_fields = ['status', 'reviewed_at']
-
-class JoinRequestCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = JoinRequest
-        fields = ['organization', 'message']

@@ -64,6 +64,10 @@ h1, h2, h3, h4, h5, h6, .brand-font {
   .input-jira {
     @apply w-full px-3 py-2 bg-[#F4F5F7] border-2 border-transparent rounded focus:bg-white focus:border-[#4C9AFF] transition-all duration-200 text-sm outline-none;
   }
+
+  .input-premium {
+    @apply w-full px-5 bg-[#F8FAFC] border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-blue-600 transition-all duration-200 text-sm outline-none text-gray-800 placeholder:text-gray-400 font-medium;
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar {

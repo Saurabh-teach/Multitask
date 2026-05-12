@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { Toaster } from 'react-hot-toast';
 import React from 'react';
 
@@ -15,9 +16,12 @@ import AllTasks from './pages/tasks/AllTasks';
 import ResourceManagement from './pages/members/ResourceManagement';
 import Chat from './pages/chat/Chat';
 import TalentPool from './pages/members/TalentPool';
-import InviteMember from './pages/members/InviteMember';
+import InvitationWizard from './pages/members/InvitationWizard';
 import Organizations from './pages/organizations/Organizations';
 import CreateOrganization from './pages/organizations/CreateOrganization';
+import JoinOrganization from './pages/organizations/JoinOrganization';
+import SearchOrganization from './pages/organizations/SearchOrganization';
+import WorkspaceMailbox from './pages/organizations/WorkspaceMailbox';
 import CreateGoal from './pages/goals/CreateGoal';
 import GoalDetail from './pages/goals/GoalDetail';
 import CreateTask from './pages/tasks/CreateTask';
@@ -35,7 +39,8 @@ import Permissions from './pages/permissions/Permissions';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <NotificationProvider>
+        <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
@@ -54,9 +59,12 @@ function App() {
           <Route path="/chat/:orgId" element={<Chat />} />
           <Route path="/chat/:orgId/:roomId" element={<Chat />} />
           <Route path="/talent-pool" element={<TalentPool />} />
-          <Route path="/members/invite" element={<InviteMember />} />
+          <Route path="/members/invite" element={<InvitationWizard />} />
           <Route path="/organizations" element={<Organizations />} />
           <Route path="/organizations/create" element={<CreateOrganization />} />
+          <Route path="/organizations/:orgId/join" element={<JoinOrganization />} />
+          <Route path="/organizations/search" element={<SearchOrganization />} />
+          <Route path="/organizations/mailbox" element={<WorkspaceMailbox />} />
           <Route path="/goals/create" element={<CreateGoal />} />
           <Route path="/goals/:goalId" element={<GoalDetail />} />
           <Route path="/tasks/create" element={<CreateTask />} />
@@ -98,6 +106,7 @@ function App() {
           }}
         />
       </Router>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

@@ -8,11 +8,13 @@ import uuid
 from django.utils import timezone
 from datetime import timedelta
 
-from organizations.models import Organization, OrganizationMember, Invitation, JoinRequest, InviteCode
+from organizations.models import Organization, OrganizationMember, InviteCode
+from invitations.models import Invitation
 from organizations.serializers import (
-    OrganizationSerializer, OrganizationMemberSerializer, 
-    JoinRequestSerializer, JoinRequestCreateSerializer
+    OrganizationSerializer, OrganizationMemberSerializer
 )
+from invitations.serializers import InvitationSerializer
+
 from users.models import User
 from users.serializers import UserSerializer
 from core.permissions import has_permission, can_manage_member, ROLE_HIERARCHY, DELEGATABLE_PERMISSIONS
@@ -29,11 +31,27 @@ class SetupWorkspaceView(APIView):
         org = Organization.objects.create(name=name, created_by=request.user)
         OrganizationMember.objects.create(organization=org, user=request.user, role='owner')
 
+        # 🚀 Seed Data: Create Template Goals for the new user
+        from goals.models import Goal
+        template_goals = [
+            {"title": "🚀 Strategic Roadmap 2026", "description": "High-level vision and long-term milestones for the organization.", "priority": "high"},
+            {"title": "🏃 Q2 Team Sprint", "description": "Short-term execution goals for the current quarter.", "priority": "medium"},
+            {"title": "💡 Internal R&D", "description": "Innovation projects and research explorations.", "priority": "low"},
+        ]
+        
+        for goal_data in template_goals:
+            Goal.objects.create(
+                organization=org,
+                created_by=request.user,
+                owner=request.user,
+                **goal_data
+            )
+
         request.user.setup_step = 3
         request.user.save()
 
         return Response({
-            "message": "Workspace created!",
+            "message": "Workspace created with template goals!",
             "organization": OrganizationSerializer(org).data,
             "setup_step": request.user.setup_step
         })
@@ -75,6 +93,29 @@ class MyOrganizationsView(APIView):
             })
             data.append(org_data)
         return Response({"total_organizations": len(data), "organizations": data})
+
+class SearchOrganizationView(APIView):
+    """
+    Search for organizations by name or email to send join requests.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        query = request.query_params.get('query', '').strip()
+        if not query or len(query) < 3:
+            return Response([])
+        
+        orgs = Organization.objects.filter(
+            Q(name__icontains=query) | Q(organization_email__icontains=query)
+        ).only('id', 'name', 'organization_email')[:10]
+        
+        return Response([
+            {
+                "id": o.id, 
+                "name": o.name, 
+                "email": o.organization_email
+            } for o in orgs
+        ])
 
 class OrganizationMembersView(APIView):
     permission_classes = [IsAuthenticated]
@@ -284,52 +325,6 @@ class GenerateInviteLinkView(APIView):
         
         return Response({"invite_link": link, "token": token})
 
-class SendJoinRequestView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        serializer = JoinRequestCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            organization = serializer.validated_data['organization']
-            
-            if OrganizationMember.objects.filter(organization=organization, user=request.user).exists():
-                return Response({"error": "You are already a member"}, status=status.HTTP_400_BAD_REQUEST)
-            
-            join_request = serializer.save(user=request.user)
-            return Response({
-                "message": "Join request sent successfully!",
-                "request": JoinRequestSerializer(join_request).data
-            }, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class ManageJoinRequestView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, request_id):
-        join_request = get_object_or_404(JoinRequest, id=request_id)
-        
-        action = request.data.get('action')
-        
-        if action == 'approve':
-            join_request.status = 'approved'
-            join_request.reviewed_by = request.user
-            join_request.save()
-            
-            OrganizationMember.objects.create(
-                organization=join_request.organization,
-                user=join_request.user,
-                role='user'
-            )
-            return Response({"message": "User approved and added as User"})
-            
-        elif action == 'reject':
-            join_request.status = 'rejected'
-            join_request.reviewed_by = request.user
-            join_request.save()
-            return Response({"message": "Join request rejected"})
-        
-        return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
 
 class RemoveMemberView(APIView):
     permission_classes = [IsAuthenticated]

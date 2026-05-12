@@ -96,9 +96,17 @@ const InviteTeam = () => {
           </div>
         </div>
 
-        <div className="space-y-2 mb-8">
+        <div className="space-y-2 mb-8 text-center">
             <h2 className="text-3xl font-bold text-gray-900 brand-font">Invite your teammates</h2>
-            <p className="text-gray-500 font-medium text-sm">GoalFlow is better together. Add your team to get started.</p>
+            
+            <div className="flex items-center gap-2 my-6">
+              <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+              <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+              <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+              <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+            </div>
+            
+            <p className="text-gray-500 font-medium text-sm">Step 4: GoalFlow is better together. Add your team to get started.</p>
         </div>
 
         <div className="space-y-3 mb-10">

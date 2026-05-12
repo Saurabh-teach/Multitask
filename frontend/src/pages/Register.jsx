@@ -11,6 +11,7 @@ const Register = () => {
     first_name: '',
     last_name: '',
     email: '',
+    phone: '',
     password: '',
   });
   const [loading, setLoading] = useState(false);
@@ -71,7 +72,15 @@ const Register = () => {
           </div>
 
           <h2 className="text-3xl font-bold text-gray-900 mb-2 brand-font">Get started for free</h2>
-          <p className="text-gray-500 mb-8 font-medium">Step 1: Create your professional profile.</p>
+          
+          <div className="flex items-center gap-2 mb-8">
+            <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+            <div className="flex-1 h-1.5 bg-gray-100 rounded-full"></div>
+            <div className="flex-1 h-1.5 bg-gray-100 rounded-full"></div>
+            <div className="flex-1 h-1.5 bg-gray-100 rounded-full"></div>
+          </div>
+          
+          <p className="text-gray-500 mb-6 font-medium text-sm">Step 1: Create your professional account.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -120,6 +129,17 @@ const Register = () => {
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
                 required
+              />
+            </div>
+
+            <div className="relative">
+              <Phone className="absolute left-4 top-3.5 text-gray-400" size={18} />
+              <input
+                type="tel"
+                placeholder="Phone Number (Optional)"
+                className="input-premium pl-12"
+                value={formData.phone}
+                onChange={(e) => setFormData({...formData, phone: e.target.value})}
               />
             </div>
 

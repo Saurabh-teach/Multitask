@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { AuthContext } from '../../context/AuthContext';
 import Sidebar from '../../components/layout/Sidebar';
+import NotificationBell from '../../components/layout/NotificationBell';
 import toast from 'react-hot-toast';
 import { 
   Search, Filter, Clock, CheckCircle2, 
@@ -45,7 +46,7 @@ const AllTasks = () => {
 
     setLoading(true);
     try {
-      const orgsRes = await apiClient.get('/my-organizations/');
+      const orgsRes = await apiClient.get('my-organizations/');
       const orgsList = orgsRes.data.organizations || [];
       const currentOrg = orgsList.find(o => (o.id || o.organization_id) === currentOrgId);
 
@@ -56,8 +57,8 @@ const AllTasks = () => {
       }
 
       const [taskRes, goalRes] = await Promise.all([
-          apiClient.get(`/organizations/${currentOrgId}/tasks/`),
-          apiClient.get(`/organizations/${currentOrgId}/goals/`)
+          apiClient.get(`organizations/${currentOrgId}/tasks/`),
+          apiClient.get(`organizations/${currentOrgId}/goals/`)
       ]);
       
       setTasks(Array.isArray(taskRes.data) ? taskRes.data : []);
@@ -127,12 +128,15 @@ const AllTasks = () => {
                   Task Repository
                 </h1>
               </div>
-              <button 
-                onClick={() => navigate('/tasks/create')}
-                className="bg-[#0052CC] hover:bg-[#0747A6] text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20"
-              >
-                Create New Task
-              </button>
+              <div className="flex items-center gap-4">
+                <NotificationBell />
+                <button 
+                  onClick={() => navigate('/tasks/create')}
+                  className="bg-[#0052CC] hover:bg-[#0747A6] text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                >
+                  Create New Task
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-4">

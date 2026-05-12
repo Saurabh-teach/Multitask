@@ -13,7 +13,9 @@ urlpatterns = [
         path('', include('tasks.urls')),
         path('', include('chat.urls')),
         path('', include('activity_logs.urls')),
-        
+        path('', include('invitations.urls')),
+        path('', include('join_requests.urls')),
+        path('', include('notifications.urls')),
     ])),
 ]
 

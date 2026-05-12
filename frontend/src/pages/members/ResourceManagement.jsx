@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 
 const ResourceManagement = () => {
-  const [activeTab, setActiveTab] = useState('team'); // 'team' or 'talent'
+  const [activeTab, setActiveTab] = useState('team'); 
   const [members, setMembers] = useState([]);
+  const [pendingFinalization, setPendingFinalization] = useState([]);
   const [talent, setTalent] = useState([]);
   const [organizations, setOrganizations] = useState([]);
   const [currentOrgId, setCurrentOrgId] = useState('');
@@ -71,10 +72,38 @@ const ResourceManagement = () => {
       }
       
       fetchTalentPool();
+      if (activeOrgId) fetchPendingFinalization(activeOrgId);
     } catch (err) {
       toast.error("Failed to sync workforce data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPendingFinalization = async (orgId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get('http://127.0.0.1:8000/api/auth/invitations/', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = res.data.results || res.data;
+      const accepted = data.filter(inv => inv.status === 'accepted' && String(inv.organization) === String(orgId));
+      setPendingFinalization(accepted);
+    } catch (err) {
+      console.error("Failed to fetch pending finalizations", err);
+    }
+  };
+
+  const handleFinalize = async (inviteId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`http://127.0.0.1:8000/api/auth/invitations/${inviteId}/finalize/`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("Membership finalized! Member added to team.");
+      fetchInitialData();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Finalization failed");
     }
   };
 
@@ -251,11 +280,23 @@ const ResourceManagement = () => {
             </div>
           </div>
 
-          {/* Single View Info */}
-          <div className="px-10 py-2">
-             <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                Active Organization Members ({members.length})
-             </span>
+          <div className="px-10 py-2 flex items-center gap-4">
+             <button 
+               onClick={() => setActiveTab('team')}
+               className={`text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-full border transition-all ${
+                 activeTab === 'team' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'
+               }`}
+             >
+               Active Members ({members.length})
+             </button>
+             <button 
+               onClick={() => setActiveTab('pending')}
+               className={`text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-full border transition-all ${
+                 activeTab === 'pending' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'
+               }`}
+             >
+               Pending Finalization ({pendingFinalization.length})
+             </button>
           </div>
         </nav>
 
@@ -271,13 +312,14 @@ const ResourceManagement = () => {
                   <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-widest">
                        <th className="py-5 px-10">Resource</th>
-                       <th className="py-5 px-6">{activeTab === 'team' ? 'Current Load' : 'Specialization'}</th>
-                       <th className="py-5 px-6">{activeTab === 'team' ? 'Active Projects' : 'Availability'}</th>
+                       <th className="py-5 px-6">{activeTab === 'team' ? 'Current Load' : 'Status'}</th>
+                       <th className="py-5 px-6">{activeTab === 'team' ? 'Active Projects' : 'Actions Required'}</th>
                        <th className="py-5 px-10 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {filteredTeam.map((person) => (
+                    {/* Active Team View */}
+                    {activeTab === 'team' && filteredTeam.map((person) => (
                       <tr key={person.member_id || person.id} className="group hover:bg-blue-50/20 transition-all">
                         <td className="py-6 px-10">
                           <div className="flex items-center gap-4">
@@ -295,43 +337,30 @@ const ResourceManagement = () => {
                           </div>
                         </td>
                         <td className="py-6 px-6">
-                           {activeTab === 'team' ? (
-                             <div className="space-y-1.5">
-                                <div className="flex justify-between text-[10px] font-bold uppercase text-gray-400">
-                                   <span>Utilization</span>
-                                   <span className="text-blue-600">{person.completion_rate}</span>
-                                </div>
-                                <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                   <div className="h-full bg-blue-500" style={{ width: person.completion_rate }} />
-                                </div>
-                             </div>
-                           ) : (
-                             <div className="flex items-center gap-2 text-[12px] font-bold text-gray-600 uppercase tracking-wide">
-                                <Briefcase size={14} className="text-gray-400" />
-                                {person.job_title || 'Expert Professional'}
-                             </div>
-                           )}
+                           <div className="space-y-1.5">
+                              <div className="flex justify-between text-[10px] font-bold uppercase text-gray-400">
+                                 <span>Utilization</span>
+                                 <span className="text-blue-600">{person.completion_rate}</span>
+                              </div>
+                              <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                 <div className="h-full bg-blue-500" style={{ width: person.completion_rate }} />
+                              </div>
+                           </div>
                         </td>
                         <td className="py-6 px-6">
-                           {activeTab === 'team' ? (
-                             <div className="flex flex-wrap gap-2">
-                                {person.active_tasks?.length > 0 ? (
-                                  person.active_tasks.map((task, i) => (
-                                    <span key={i} className="px-2 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-500 truncate max-w-[120px]">
-                                      {task}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="text-[10px] font-bold text-amber-500 uppercase flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
-                                    <AlertCircle size={12} /> Bench / No Work
+                           <div className="flex flex-wrap gap-2">
+                              {person.active_tasks?.length > 0 ? (
+                                person.active_tasks.map((task, i) => (
+                                  <span key={i} className="px-2 py-1 bg-white border border-gray-100 rounded-lg text-[10px] font-bold text-gray-500 truncate max-w-[120px]">
+                                    {task}
                                   </span>
-                                )}
-                             </div>
-                           ) : (
-                             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[10px] font-bold uppercase tracking-widest">
-                                <CheckCircle2 size={12} /> Ready to Assign
-                             </span>
-                           )}
+                                ))
+                              ) : (
+                                <span className="text-[10px] font-bold text-amber-500 uppercase flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
+                                  <AlertCircle size={12} /> Bench / No Work
+                                </span>
+                              )}
+                           </div>
                         </td>
                         <td className="py-6 px-10 text-right">
                            {['owner', 'admin'].includes(userRole?.toLowerCase()) && (
@@ -345,6 +374,51 @@ const ResourceManagement = () => {
                         </td>
                       </tr>
                     ))}
+
+                    {/* Pending Approval View */}
+                    {activeTab === 'pending' && pendingFinalization.map((invite) => (
+                      <tr key={invite.id} className="group hover:bg-amber-50/50 transition-all">
+                        <td className="py-6 px-10">
+                          <div className="flex items-center gap-4">
+                             <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center font-bold text-xl">
+                                {invite.first_name?.[0] || invite.email[0].toUpperCase()}
+                             </div>
+                             <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-bold text-gray-900 text-[15px]">{invite.first_name} {invite.last_name}</p>
+                                  {getRoleBadge(invite.role)}
+                                </div>
+                                <p className="text-[11px] text-gray-400 font-medium">{invite.email}</p>
+                             </div>
+                          </div>
+                        </td>
+                        <td className="py-6 px-6">
+                           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[10px] font-bold uppercase tracking-widest">
+                              <CheckCircle2 size={12} /> User Accepted
+                           </span>
+                        </td>
+                        <td className="py-6 px-6">
+                           <p className="text-[11px] text-gray-500 font-medium italic max-w-xs truncate" title={invite.message}>
+                             "{invite.message || 'Standard invitation sent.'}"
+                           </p>
+                        </td>
+                        <td className="py-6 px-10 text-right">
+                           <button 
+                             onClick={() => handleFinalize(invite.id)}
+                             className="px-6 py-2.5 bg-[#172B4D] text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-gray-900/10 flex items-center gap-2 ml-auto"
+                           >
+                              <Plus size={14} /> Finalize Access
+                           </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {activeTab === 'pending' && pendingFinalization.length === 0 && (
+                      <tr>
+                        <td colSpan="4" className="py-20 text-center text-gray-400 italic text-sm">
+                          No members waiting for finalization.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                </table>
             </div>

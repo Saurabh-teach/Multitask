@@ -7,6 +7,7 @@ import {
   Activity, Compass, ChevronRight
 } from 'lucide-react';
 import Sidebar from '../../components/layout/Sidebar';
+import NotificationBell from '../../components/layout/NotificationBell';
 import { toast } from 'react-hot-toast';
 
 const Goals = () => {
@@ -17,6 +18,7 @@ const Goals = () => {
   const [filter, setFilter] = useState('all');
   const [userRole, setUserRole] = useState('user');
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -36,13 +38,13 @@ const Goals = () => {
   const fetchGoals = async () => {
     try {
       setLoading(true);
-      const orgsRes = await apiClient.get('/my-organizations/');
+      const orgsRes = await apiClient.get('my-organizations/');
       const currentOrg = orgsRes.data.organizations?.find(o => (o.organization_id || o.id) === orgId);
       
       if (currentOrg) {
         setUserRole(currentOrg.role || 'user');
         setCurrentUserId(currentOrg.user_id);
-        const res = await apiClient.get(`/organizations/${orgId}/goals/`);
+        const res = await apiClient.get(`organizations/${orgId}/goals/`);
         setGoals(res.data);
         setFilteredGoals(res.data);
       }
@@ -58,7 +60,7 @@ const Goals = () => {
     if (!window.confirm("Are you sure you want to delete this goal?")) return;
     
     try {
-      await apiClient.delete(`/goals/${goalId}/delete/`);
+      await apiClient.delete(`goals/${goalId}/delete/`);
       toast.success("Goal deleted");
       fetchGoals();
     } catch (err) {
@@ -107,13 +109,18 @@ const Goals = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5E6C84]" size={16} />
                 <input 
                   type="text" 
-                  placeholder="Search goals..." 
-                  className="pl-10 pr-4 py-2 bg-[#F4F5F7] border-2 border-transparent rounded focus:bg-white focus:border-[#4C9AFF] outline-none text-sm w-64 transition-all"
+                  placeholder="Filter goals..." 
+                  className="w-64 pl-10 pr-4 py-2 bg-[#F4F5F7] border border-[#DFE1E6] rounded focus:bg-white focus:border-[#4C9AFF] transition-all outline-none text-sm"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+
+              <NotificationBell />
+
               <button 
                 onClick={() => navigate('/goals/create')}
-                className="bg-[#0052CC] hover:bg-[#0747A6] text-white px-4 py-2 rounded font-medium text-sm transition-all flex items-center gap-2"
+                className="bg-[#0052CC] text-white px-4 py-2 rounded font-medium hover:bg-[#0747A6] transition-all flex items-center gap-2 text-sm"
               >
                 <Plus size={18} /> Create Goal
               </button>

@@ -41,22 +41,5 @@ class Goal(models.Model):
         self.save()
 
     def update_progress(self):
-        active_tasks = self.tasks.filter(is_deleted=False)
-        total_count = active_tasks.count()
-        
-        if total_count == 0:
-            self.progress = 0
-        else:
-            completed_count = active_tasks.filter(status='done').count()
-            self.progress = (completed_count / total_count) * 100
-            
-            if self.progress == 100:
-                self.status = 'completed'
-            elif self.progress > 0:
-                if self.status in ['not_started', 'at_risk']:
-                    self.status = 'in_progress'
-            else:
-                if self.status == 'completed':
-                    self.status = 'in_progress'
-        
-        self.save()
+        from calculations.services import GoalCalculator
+        GoalCalculator.update_goal_progress(self)

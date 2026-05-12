@@ -5,7 +5,7 @@ import apiClient from '../../api/client';
 import { 
   LayoutDashboard, ListTodo, Target, Users, 
   Building2, LogOut, Settings, HelpCircle, ChevronRight, MessageSquare, Shield, BarChart3,
-  ChevronDown
+  ChevronDown, Inbox
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -22,7 +22,7 @@ const Sidebar = () => {
 
   const fetchOrganizations = async () => {
     try {
-      const res = await apiClient.get('/my-organizations/');
+      const res = await apiClient.get('my-organizations/');
       const orgs = res.data.organizations || [];
       setOrganizations(orgs);
 
@@ -89,9 +89,11 @@ const Sidebar = () => {
     { to: '/goals', label: 'All Goals', icon: Target },
     { to: '/tasks', label: 'All Tasks', icon: ListTodo },
     { to: '/board', label: 'Sprint Board', icon: BarChart3 },
-    { to: '/members', label: 'Our Team', icon: Users, category: 'Workspace' },
+    { to: '/organizations/mailbox', label: 'Workspace Mailbox', icon: Inbox, category: 'Workspace', permission: 'org_edit' },
+    { to: '/members', label: 'Our Team', icon: Users },
     { to: `/chat/${currentOrgId}`, label: 'Messenger', icon: MessageSquare, category: 'Communication' },
     { to: '/talent-pool', label: 'Member Pool', icon: Users, permission: 'member_invite' },
+    { to: '/organizations/search', label: 'Discover Workspaces', icon: Building2, category: 'Personal' },
     { to: '/organizations', label: 'Organizations', icon: Building2, permission: 'org_edit' },
     { to: '/permissions', label: 'Work Permissions', icon: Shield, permission: 'member_change_role', category: 'Workspace' },
     { to: '/reports', label: 'Reports', icon: BarChart3, category: 'Workspace' },
@@ -176,16 +178,25 @@ const Sidebar = () => {
         </div>
 
         <div className="flex items-center gap-3 p-2 rounded hover:bg-[#EBECF0] transition-all cursor-pointer group">
-          <div className="w-8 h-8 bg-[#0052CC] rounded flex items-center justify-center text-white font-bold text-xs uppercase">
+          <div className="w-9 h-9 bg-[#0052CC] rounded-lg flex items-center justify-center text-white font-bold text-sm uppercase shadow-sm">
             {profile.name.charAt(0)}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-[#172B4D] truncate leading-tight">{profile.name}</p>
-            <p className="text-xs text-[#5E6C84] truncate">{profile.role}</p>
+            <p className="text-sm font-bold text-[#172B4D] truncate leading-tight">{profile.name}</p>
+            <p className="text-[10px] text-[#5E6C84] truncate">{organizations.find(o => (o.id || o.organization_id) === currentOrgId)?.email || '...'}</p>
+            <div className="flex items-center gap-1 mt-0.5">
+               <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                 profile.role === 'Owner' ? 'bg-purple-100 text-purple-700' : 
+                 profile.role === 'Admin' ? 'bg-red-100 text-red-700' : 
+                 'bg-blue-100 text-blue-700'
+               }`}>
+                 {profile.role}
+               </span>
+            </div>
           </div>
           <button 
             onClick={handleLogout}
-            className="text-[#5E6C84] hover:text-[#DE350B] p-1.5 rounded hover:bg-[#FFEBE6] transition-all"
+            className="text-[#5E6C84] hover:text-[#DE350B] p-2 rounded hover:bg-[#FFEBE6] transition-all"
             title="Logout"
           >
             <LogOut size={16} />

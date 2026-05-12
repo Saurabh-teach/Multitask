@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import Sidebar from '../../components/layout/Sidebar';
+import NotificationBell from '../../components/layout/NotificationBell';
 import { AuthContext } from '../../context/AuthContext';
 import apiClient from '../../api/client';
 import { 
@@ -34,15 +35,21 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (token && currentOrgId) {
-      fetchDashboardData();
+    if (token) {
+      if (currentOrgId) {
+        fetchDashboardData();
+      } else {
+        apiClient.get('my-organizations/').then(res => {
+          if (!res.data.organizations?.length) setLoading(false);
+        }).catch(() => setLoading(false));
+      }
     }
   }, [token, currentOrgId]);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const orgsRes = await apiClient.get('/my-organizations/');
+      const orgsRes = await apiClient.get('my-organizations/');
       const organizations = orgsRes.data.organizations || [];
       const currentOrg = organizations.find(o => (o.id || o.organization_id) === currentOrgId);
       
@@ -52,7 +59,7 @@ const Dashboard = () => {
         return;
       }
 
-      const dashboardRes = await apiClient.get(`/organizations/${currentOrgId}/dashboard/`);
+      const dashboardRes = await apiClient.get(`organizations/${currentOrgId}/dashboard/`);
       
       if (currentOrg) {
         setUser({
@@ -78,7 +85,7 @@ const Dashboard = () => {
   const handleDeleteGoal = async (goalId) => {
     if (!window.confirm("Are you sure you want to delete this goal?")) return;
     try {
-      await apiClient.delete(`/goals/${goalId}/delete/`);
+      await apiClient.delete(`goals/${goalId}/delete/`);
       toast.success("Goal removed");
       fetchDashboardData();
     } catch (err) {
@@ -107,6 +114,9 @@ const Dashboard = () => {
                   className="w-64 pl-10 pr-4 py-2 bg-[#F4F5F7] border-2 border-transparent rounded focus:bg-white focus:border-[#4C9AFF] transition-all outline-none text-sm"
                 />
               </div>
+
+              <NotificationBell />
+              
               <div className="flex gap-2">
                  <button onClick={() => navigate('/tasks/create')} className="px-4 py-2 text-sm font-medium text-[#42526E] bg-[#EBECF0] rounded hover:bg-[#DFE1E6] transition-all">Add Task</button>
                  <button onClick={() => navigate('/goals/create')} className="px-4 py-2 text-sm font-medium text-white bg-[#0052CC] rounded hover:bg-[#0747A6] transition-all">New Goal</button>

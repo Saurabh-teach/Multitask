@@ -29,7 +29,7 @@ const Members = () => {
   const fetchMembers = async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get(`/organizations/${currentOrgId}/members/`);
+      const res = await apiClient.get(`organizations/${currentOrgId}/members/`);
       setMembers(res.data.members || []);
       setOrganizationName(res.data.organization_name || 'Organization');
     } catch (err) {
@@ -43,7 +43,7 @@ const Members = () => {
     if (!window.confirm("Remove this member? All their active tasks will be unassigned.")) return;
     
     try {
-      await apiClient.delete(`/organizations/members/${memberId}/remove/`);
+      await apiClient.delete(`organizations/members/${memberId}/remove/`);
       toast.success("Member removed from workspace");
       fetchMembers();
     } catch (err) {

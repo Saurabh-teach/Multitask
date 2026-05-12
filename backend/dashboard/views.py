@@ -26,31 +26,13 @@ class DashboardStatsView(APIView):
             if not member:
                 return Response({"error": "Permission denied"}, status=403)
 
-            # Filtering for stats based on role and visibility
-            if member.role in ['owner', 'admin']:
-                visible_goals_base = Goal.objects.filter(organization=org)
-                visible_tasks_base = Task.objects.filter(organization=org, is_deleted=False)
-            else:
-                visible_goals_base = Goal.objects.filter(organization=org).filter(
-                    Q(visibility_type='organization') | Q(created_by=user) | Q(owner=user) | Q(visible_to=user) | Q(tasks__assignees=user)
-                ).distinct()
-                visible_tasks_base = Task.objects.filter(organization=org, is_deleted=False).filter(
-                    Q(visibility_type='organization') | Q(created_by=user) | Q(assignees=user) | Q(visible_to=user)
-                ).distinct()
-
-            active_goals = visible_goals_base.exclude(status='completed').count()
-            open_tasks = visible_tasks_base.exclude(status='done').count()
-            
-            total_tasks = visible_tasks_base.count()
-            done_tasks = visible_tasks_base.filter(status='done').count()
-            completion = int((done_tasks / total_tasks * 100) if total_tasks > 0 else 0)
-            
-            team_members = OrganizationMember.objects.filter(organization=org, is_active=True).count()
+            from calculations.services import DashboardCalculator
+            metrics = DashboardCalculator.get_workspace_metrics(org, user, member)
             
             activity_qs = ActivityLog.objects.filter(organization=org).order_by('-created_at')[:10]
             recent_activity = ActivityLogSerializer(activity_qs, many=True).data
             
-            recent_goals_qs = visible_goals_base.order_by('-created_at')[:5]
+            recent_goals_qs = metrics['visible_goals_base'].order_by('-created_at')[:5]
             recent_goals = [{"id": str(g.id), "title": g.title, "status": g.status, "progress": g.progress} for g in recent_goals_qs]
 
             # Build actual effective permissions for the frontend
@@ -100,10 +82,10 @@ class DashboardStatsView(APIView):
             return Response({
                 "role": member.role,
                 "permissions": effective_permissions,
-                "activeGoals": active_goals,
-                "openTasks": open_tasks,
-                "completion": completion,
-                "teamMembers": team_members,
+                "activeGoals": metrics["active_goals"],
+                "openTasks": metrics["open_tasks"],
+                "completion": metrics["completion"],
+                "teamMembers": metrics["team_members"],
                 "recentGoals": recent_goals,
                 "myTasks": my_tasks,
                 "myCreatedGoals": my_created_goals,

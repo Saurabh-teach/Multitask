@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f5f7; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background-color: #36b37e; color: #ffffff; padding: 40px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
+        .content { padding: 40px; color: #172b4d; line-height: 1.6; }
+        .content p { margin-bottom: 20px; }
+        .button-container { text-align: center; margin: 40px 0; }
+        .button { background-color: #36b37e; color: #ffffff !important; padding: 16px 32px; border-radius: 6px; text-decoration: none; font-weight: 700; display: inline-block; }
+        .footer { background-color: #f4f5f7; color: #5e6c84; padding: 20px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Welcome to the Team!</h1>
+        </div>
+        <div class="content">
+            <p>Great news! Your request to join <strong>{{ org_name }}</strong> has been <strong>Approved</strong>.</p>
+            <p>You now have full access to collaborate on goals, manage tasks, and communicate with your team members in this workspace.</p>
+            
+            <div class="button-container">
+                <a href="http://localhost:3000/dashboard" class="button">Go to Dashboard</a>
+            </div>
+            
+            <p>We're excited to have you on board. Let's build something great together!</p>
+        </div>
+        <div class="footer">
+            <p>Sent from <strong>{{ org_name }}</strong> via GoalFlow Enterprise</p>
+            <p>&copy; 2026 GoalFlow AI. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

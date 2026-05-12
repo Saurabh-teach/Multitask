@@ -51,7 +51,15 @@ const Personalize = () => {
 
         <div className="space-y-2 mb-10">
             <h2 className="text-3xl font-bold text-gray-900 brand-font">What is your role?</h2>
-            <p className="text-gray-500 font-medium">We'll tailor your experience based on what you do.</p>
+            
+            <div className="flex items-center gap-2 my-6 px-1">
+              <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+              <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+              <div className="flex-1 h-1.5 bg-blue-600 rounded-full"></div>
+              <div className="flex-1 h-1.5 bg-gray-100 rounded-full"></div>
+            </div>
+            
+            <p className="text-gray-500 font-medium text-sm">Step 3: We'll tailor your experience based on what you do.</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">

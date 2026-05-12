@@ -49,28 +49,26 @@ const InviteMember = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const orgRes = await axios.get('http://127.0.0.1:8000/api/auth/my-organizations/', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const orgId = orgRes.data.organizations?.[0]?.organization_id;
+      const activeOrgId = localStorage.getItem('orgId');
 
-      await axios.post('http://127.0.0.1:8000/api/auth/invite-team/', {
-        emails: [formData.email],
-        organization_id: orgId
+      if (!activeOrgId) {
+        toast.error("Please select an organization first.");
+        return;
+      }
+
+      await axios.post('http://127.0.0.1:8000/api/auth/invitations/', {
+        email: formData.email,
+        organization: activeOrgId,
+        role: formData.role
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      toast.success("Invitation sent! Check terminal for link.");
+      toast.success("Invitation sent successfully!");
       setFormData({...formData, email: ''});
     } catch (err) {
-      if (err.response?.status === 401) {
-        toast.error("Session expired. Please log in again.");
-        localStorage.removeItem('token');
-        navigate('/login');
-      } else {
-        toast.error("Failed to send invitation");
-      }
+      const msg = err.response?.data?.error || "Failed to send invitation";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
